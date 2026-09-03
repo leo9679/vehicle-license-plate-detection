@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrasi - Sistem Parkir UTY</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        .registration-card {
+            border-left: 4px solid #198754;
+        }
+        
+        .form-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .section-title {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #198754;
+        }
+        
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .plate-preview {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .category-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-2px);
+            border-color: #198754;
+        }
+        
+        .category-card.selected {
+            border-color: #198754;
+            background-color: rgba(25, 135, 84, 0.05);
+        }
+        
+        .info-alert {
+            border-left: 4px solid #0dcaf0;
+        }
+        
+        .success-alert {
+            border-left: 4px solid #198754;
+        }
+        
+        .error-alert {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+        
+        /* Style untuk success popup */
+        .success-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1060;
+            text-align: center;
+            min-width: 300px;
+            border: 4px solid #198754;
+        }
+        
+        .success-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1050;
+        }
+        
+        .success-icon {
+            font-size: 4rem;
+            color: #198754;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- ==============================
+         HEADER SECTION
+    ============================== -->
+    <header class="bg-success text-white shadow-sm">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">
+                                <i class="fas fa-user-plus me-2"></i>
+                                REGISTRASI PENGGUNA & KENDARAAN
+                            </h1>
+                            <p class="mb-0 opacity-75">Daftarkan pengguna dan kendaraan baru ke sistem parkir</p>
+                        </div>
+                        <a href="{{ url_for('index') }}" class="btn btn-light">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==============================
+         MAIN CONTENT SECTION
+    ============================== -->
+    <main class="container-fluid py-4">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+                
+                <!-- Registration Form Card -->
+                <section class="card shadow-sm registration-card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2 text-success"></i>
+                            FORM REGISTRASI BARU
+                        </h5>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Info Alert -->
+                        <div class="alert alert-info info-alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Informasi Penting:</strong> 
+                            <ul class="mb-0 mt-2">
+                                <li>Isi semua field yang wajib diisi (<span class="text-danger">*</span>)</li>
+                                <li>No. Telepon harus angka (10-13 digit)</li>
+                                <li>NPM/NIP harus angka (kecuali Tamu)</li>
+                                <li>Plat nomor format: Huruf-Angka-Huruf TANPA SPASI (contoh: AB1234CD)</li>
+                                <li>Merek & Model digabung (contoh: Honda Vario, Toyota Avanza)</li>
+                                <li>Satu pengguna boleh memiliki banyak kendaraan</li>
+                                <li><strong>Plat nomor harus UNIK - tidak boleh duplikat di sistem</strong></li>
+                            </ul>
+                        </div>
+
+                        <!-- Registration Form -->
+                        <form id="registrationForm">
+                            
+                            <!-- ====================
+                                 SECTION 1: KATEGORI PENGGUNA
+                            ==================== -->
+                            <div class="form-section">
+                                <h6 class="section-title">
+                                    <i class="fas fa-users me-2"></i>1. KATEGORI PENGGUNA
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-3">
+                                        <div class="card category-card text-center" data-category="Mahasiswa">
+                                            <div class="card-body p-3">
+                                                <i class="fas fa-graduation-cap fa-2x text-primary mb-2"></i>
+                                                <h6 class="card-title mb-1">MAHASISWA</h6>
+                                                <small class="text-muted">Wajib NPM (angka)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3">
+                                        <div class="card category-card text-center" data-category="Dosen">
+                                            <div class="card-body p-3">
+                                                <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
+                                                <h6 class="card-title mb-1">DOSEN</h6>
+                                                <small class="text-muted">Wajib NIP (angka)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3">
+                                        <div class="card category-card text-center" data-category="Staff">
+                                            <div class="card-body p-3">
+                                                <i class="fas fa-user-tie fa-2x text-info mb-2"></i>
+                                                <h6 class="card-title mb-1">STAFF</h6>
+                                                <small class="text-muted">Wajib NIP (angka)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3">
+                                        <div class="card category-card text-center" data-category="Tamu">
+                                            <div class="card-body p-3">
+                                                <i class="fas fa-users fa-2x text-warning mb-2"></i>
+                                                <h6 class="card-title mb-1">TAMU</h6>
+                                                <small class="text-muted">Tidak wajib NPM/NIP</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="categoryError" class="text-danger small mt-2" style="display: none;">
+                                    <i class="fas fa-exclamation-circle me-1"></i>Pilih kategori pengguna terlebih dahulu
+                                </div>
+                            </div>
+
+                            <!-- ====================
+                                 SECTION 2: DATA PENGGUNA
+                            ==================== -->
+                            <div class="form-section">
+                                <h6 class="section-title">
+                                    <i class="fas fa-user me-2"></i>2. DATA PENGGUNA
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <!-- Nama Lengkap -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="nama" class="form-label fw-bold required-field">Nama Lengkap</label>
+                                        <input type="text" class="form-control" id="nama" 
+                                               placeholder="Masukkan nama lengkap" required
+                                               oninput="validateNama()">
+                                        <div class="error-message" id="namaError"></div>
+                                        <div class="form-text">Nama lengkap sesuai identitas (huruf saja)</div>
+                                    </div>
+                                    
+                                    <!-- NPM/NIP -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="npm_nip" class="form-label fw-bold" id="npmNipLabel">
+                                            NPM/NIP <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="npm_nip" 
+                                               placeholder="Masukkan NPM atau NIP (angka saja)"
+                                               oninput="validateNpmNip()">
+                                        <div class="error-message" id="npmNipError"></div>
+                                        <div class="form-text" id="npmNipHelp">Wajib angka untuk Mahasiswa, Dosen, dan Staff</div>
+                                    </div>
+                                    
+                                    <!-- No. Telepon -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="no_telp" class="form-label fw-bold required-field">Nomor Telepon</label>
+                                        <input type="tel" class="form-control" id="no_telp" 
+                                               placeholder="Contoh: 081234567890" required
+                                               oninput="validateTelepon()">
+                                        <div class="error-message" id="teleponError"></div>
+                                        <div class="form-text">Nomor telepon (10-13 digit angka)</div>
+                                    </div>
+                                    
+                                    <!-- Email -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="email" class="form-label fw-bold required-field">Email</label>
+                                        <input type="email" class="form-control" id="email" 
+                                               placeholder="Contoh: nama@uty.ac.id" required
+                                               oninput="validateEmail()">
+                                        <div class="error-message" id="emailError"></div>
+                                        <div class="form-text">Alamat email aktif</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ====================
+                                 SECTION 3: DATA KENDARAAN
+                            ==================== -->
+                            <div class="form-section">
+                                <h6 class="section-title">
+                                    <i class="fas fa-car me-2"></i>3. DATA KENDARAAN
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <!-- Plat Nomor -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="plat_nomor" class="form-label fw-bold required-field">Plat Nomor</label>
+                                        <input type="text" class="form-control" id="plat_nomor" 
+                                               placeholder="Contoh: AB1234CD" required
+                                               oninput="validatePlatNomor()"
+                                               style="text-transform: uppercase;">
+                                        <div class="error-message" id="platNomorError"></div>
+                                        <div class="form-text">Format: Huruf-Angka-Huruf TANPA SPASI (contoh: AB1234CD)</div>
+                                        
+                                        <!-- Plate Availability Check -->
+                                        <div id="plateCheckResult" class="mt-2" style="display: none;">
+                                            <div id="plateAvailable" class="alert alert-success success-alert py-2" style="display: none;">
+                                                <i class="fas fa-check-circle me-2"></i>
+                                                <span>Plat nomor tersedia</span>
+                                            </div>
+                                            <div id="plateExists" class="alert alert-danger error-alert py-2" style="display: none;">
+                                                <i class="fas fa-times-circle me-2"></i>
+                                                <span>Plat nomor sudah terdaftar di sistem</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Merk & Model Kendaraan -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="merk_model" class="form-label fw-bold required-field">Merk & Model Kendaraan</label>
+                                        <input type="text" class="form-control" id="merk_model" 
+                                               placeholder="Contoh: Honda Vario, Toyota Avanza" required
+                                               oninput="validateMerkModel()">
+                                        <div class="error-message" id="merkModelError"></div>
+                                        <div class="form-text">Gabungan merk dan model kendaraan</div>
+                                    </div>
+                                    
+                                    <!-- Warna Kendaraan -->
+                                    <div class="col-12 col-md-6">
+                                        <label for="warna" class="form-label fw-bold required-field">Warna</label>
+                                        <input type="text" class="form-control" id="warna" 
+                                               placeholder="Contoh: Hitam, Putih, Silver" required
+                                               oninput="validateWarna()">
+                                        <div class="error-message" id="warnaError"></div>
+                                        <div class="form-text">Warna kendaraan</div>
+                                    </div>
+                                </div>
+
+                                <!-- Informasi Kendaraan Tambahan -->
+                                <div class="alert alert-warning mt-3">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Perhatian:</strong> Plat nomor harus UNIK dan tidak boleh duplikat di sistem. 
+                                    Sistem akan menolak plat yang sudah terdaftar untuk kategori manapun.
+                                </div>
+                            </div>
+
+                            <!-- ====================
+                                 SUBMIT BUTTON
+                            ==================== -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
+                                    <i class="fas fa-save me-2"></i>PROSES REGISTRASI
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="resetBtn">
+                                    <i class="fas fa-undo me-2"></i>RESET FORM
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Registration Result -->
+                <section id="registrationResult" class="mt-4" style="display: none;">
+                    <!-- Result will be displayed here -->
+                </section>
+
+                <!-- Quick Guide -->
+                <section class="card shadow-sm mt-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-question-circle me-2 text-primary"></i>
+                            PANDUAN REGISTRASI
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-12 col-md-6">
+                                <h6 class="text-success">
+                                    <i class="fas fa-check-circle me-2"></i>Validasi Data
+                                </h6>
+                                <ul class="small text-muted">
+                                    <li><strong>No. Telepon:</strong> 10-13 digit angka</li>
+                                    <li><strong>NPM/NIP:</strong> Angka saja (kecuali Tamu)</li>
+                                    <li><strong>Plat Nomor:</strong> Format Huruf-Angka-Huruf TANPA SPASI</li>
+                                    <li><strong>Merk & Model:</strong> Huruf dan spasi saja</li>
+                                    <li><strong>Warna:</strong> Huruf saja</li>
+                                </ul>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <h6 class="text-info">
+                                    <i class="fas fa-info-circle me-2"></i>Informasi Sistem
+                                </h6>
+                                <ul class="small text-muted">
+                                    <li>Semua field wajib diisi kecuali NPM/NIP untuk Tamu</li>
+                                    <li>Plat nomor harus unik (tidak boleh duplikat)</li>
+                                    <li>Satu pengguna bisa punya banyak kendaraan</li>
+                                    <li>Data diverifikasi oleh petugas</li>
+                                    <li><strong>Plat terdaftar tidak bisa digunakan oleh kategori lain</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- ==============================
+         SUCCESS POPUP (HIDDEN BY DEFAULT)
+    ============================== -->
+    <div id="successPopup" class="success-popup" style="display: none;">
+        <div class="success-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <h4 class="text-success mb-3">Registrasi berhasil!</h4>
+        <p class="text-muted mb-3" id="successMessage">Pengguna dan kendaraan telah terdaftar di sistem.</p>
+        <div class="d-grid gap-2">
+            <button type="button" class="btn btn-success" onclick="closeSuccessPopup()">
+                <i class="fas fa-check me-2"></i>OK
+            </button>
+        </div>
+    </div>
+    <div id="successPopupOverlay" class="success-popup-overlay" style="display: none;"></div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==============================
+        // VARIABEL GLOBAL
+        // ==============================
+        let selectedCategory = '';
+        let isPlateAvailable = false;
+
+        // ==============================
+        // EVENT LISTENERS
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Category selection
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.addEventListener('click', handleCategorySelection);
+            });
+            
+            // Plate number validation
+            document.getElementById('plat_nomor').addEventListener('input', handlePlateInput);
+            
+            // Form submission
+            document.getElementById('registrationForm').addEventListener('submit', handleFormSubmission);
+            
+            // Form reset
+            document.getElementById('resetBtn').addEventListener('click', resetForm);
+            
+            // Real-time validation
+            document.getElementById('nama').addEventListener('input', validateForm);
+            document.getElementById('npm_nip').addEventListener('input', validateForm);
+            document.getElementById('no_telp').addEventListener('input', validateForm);
+            document.getElementById('email').addEventListener('input', validateForm);
+            document.getElementById('merk_model').addEventListener('input', validateForm);
+            document.getElementById('warna').addEventListener('input', validateForm);
+        });
+
+        // ==============================
+        // VALIDATION FUNCTIONS
+        // ==============================
+        function validateNama() {
+            const nama = document.getElementById('nama').value.trim();
+            const errorElement = document.getElementById('namaError');
+            
+            if (!nama) {
+                errorElement.textContent = 'Nama wajib diisi';
+                return false;
+            }
+            
+            // Hanya huruf dan spasi
+            const namaRegex = /^[a-zA-Z\s]+$/;
+            if (!namaRegex.test(nama)) {
+                errorElement.textContent = 'Nama hanya boleh mengandung huruf dan spasi';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateNpmNip() {
+            const npmNip = document.getElementById('npm_nip').value.trim();
+            const errorElement = document.getElementById('npmNipError');
+            
+            if (selectedCategory !== 'Tamu') {
+                if (!npmNip) {
+                    errorElement.textContent = 'NPM/NIP wajib diisi';
+                    return false;
+                }
+                
+                // Hanya angka
+                const angkaRegex = /^\d+$/;
+                if (!angkaRegex.test(npmNip)) {
+                    errorElement.textContent = 'NPM/NIP hanya boleh mengandung angka';
+                    return false;
+                }
+            } else {
+                // Untuk tamu, NPM/NIP opsional tapi jika diisi harus angka
+                if (npmNip && !/^\d+$/.test(npmNip)) {
+                    errorElement.textContent = 'NPM/NIP hanya boleh mengandung angka';
+                    return false;
+                }
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateTelepon() {
+            const telepon = document.getElementById('no_telp').value.trim();
+            const errorElement = document.getElementById('teleponError');
+            
+            if (!telepon) {
+                errorElement.textContent = 'Nomor telepon wajib diisi';
+                return false;
+            }
+            
+            // Hanya angka, 10-13 digit
+            const teleponRegex = /^\d{10,13}$/;
+            if (!teleponRegex.test(telepon)) {
+                errorElement.textContent = 'Nomor telepon harus 10-13 digit angka';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateEmail() {
+            const email = document.getElementById('email').value.trim();
+            const errorElement = document.getElementById('emailError');
+            
+            if (!email) {
+                errorElement.textContent = 'Email wajib diisi';
+                return false;
+            }
+            
+            // Validasi format email sederhana
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                errorElement.textContent = 'Format email tidak valid';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validatePlatNomor() {
+            const platNomor = document.getElementById('plat_nomor').value.trim().toUpperCase();
+            const errorElement = document.getElementById('platNomorError');
+            
+            if (!platNomor) {
+                errorElement.textContent = 'Plat nomor wajib diisi';
+                return false;
+            }
+            
+            // Format: 1-2 huruf + 1-4 angka + 1-3 huruf (TANPA SPASI)
+            const platRegex = /^[A-Z]{1,2}\d{1,4}[A-Z]{1,3}$/;
+            if (!platRegex.test(platNomor)) {
+                errorElement.textContent = 'Format plat tidak valid. Contoh: AB1234CD atau B123XYZ (TANPA SPASI)';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateMerkModel() {
+            const merkModel = document.getElementById('merk_model').value.trim();
+            const errorElement = document.getElementById('merkModelError');
+            
+            if (!merkModel) {
+                errorElement.textContent = 'Merk & model wajib diisi';
+                return false;
+            }
+            
+            // Hanya huruf, angka, dan spasi
+            const merkRegex = /^[a-zA-Z0-9\s]+$/;
+            if (!merkRegex.test(merkModel)) {
+                errorElement.textContent = 'Merk & model hanya boleh mengandung huruf, angka, dan spasi';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        function validateWarna() {
+            const warna = document.getElementById('warna').value.trim();
+            const errorElement = document.getElementById('warnaError');
+            
+            if (!warna) {
+                errorElement.textContent = 'Warna wajib diisi';
+                return false;
+            }
+            
+            // Hanya huruf
+            const warnaRegex = /^[a-zA-Z\s]+$/;
+            if (!warnaRegex.test(warna)) {
+                errorElement.textContent = 'Warna hanya boleh mengandung huruf dan spasi';
+                return false;
+            }
+            
+            errorElement.textContent = '';
+            return true;
+        }
+
+        // ==============================
+        // CATEGORY HANDLING
+        // ==============================
+        function handleCategorySelection(event) {
+            const card = event.currentTarget;
+            selectedCategory = card.dataset.category;
+            
+            // Reset all cards
+            document.querySelectorAll('.category-card').forEach(c => {
+                c.classList.remove('selected');
+            });
+            
+            // Activate selected card
+            card.classList.add('selected');
+            
+            // Update form requirements
+            updateFormRequirements();
+            
+            // Hide category error
+            document.getElementById('categoryError').style.display = 'none';
+            
+            // Validate form
+            validateForm();
+        }
+
+        function updateFormRequirements() {
+            const npmNipLabel = document.getElementById('npmNipLabel');
+            const npmNipHelp = document.getElementById('npmNipHelp');
+            const npmNipInput = document.getElementById('npm_nip');
+            
+            if (selectedCategory === 'Tamu') {
+                npmNipLabel.innerHTML = 'NPM/NIP <span class="text-muted">(Opsional)</span>';
+                npmNipHelp.textContent = 'Opsional untuk Tamu (harus angka jika diisi)';
+                npmNipInput.required = false;
+            } else {
+                npmNipLabel.innerHTML = 'NPM/NIP <span class="text-danger">*</span>';
+                npmNipHelp.textContent = `Wajib angka untuk ${selectedCategory}`;
+                npmNipInput.required = true;
+                npmNipInput.placeholder = `Masukkan ${selectedCategory === 'Mahasiswa' ? 'NPM' : 'NIP'} (angka saja)`;
+            }
+            
+            // Reset NPM/NIP validation
+            validateNpmNip();
+        }
+
+        // ==============================
+        // PLATE NUMBER VALIDATION
+        // ==============================
+        function handlePlateInput() {
+            const plateInput = document.getElementById('plat_nomor');
+            let plateNumber = plateInput.value.trim().toUpperCase();
+            
+            // HAPUS SEMUA SPASI DARI INPUT
+            plateNumber = plateNumber.replace(/\s+/g, '');
+            plateInput.value = plateNumber;
+            
+            // Validasi format plat
+            validatePlatNomor();
+            
+            if (plateNumber.length >= 5 && validatePlatNomor()) {
+                checkPlateAvailability(plateNumber);
+            } else {
+                hidePlateCheckResult();
+            }
+            
+            validateForm();
+        }
+
+        function checkPlateAvailability(plateNumber) {
+            fetch(`/api/check_plate?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const resultContainer = document.getElementById('plateCheckResult');
+                    
+                    if (data.success) {
+                        if (data.exists) {
+                            // Plate already exists
+                            document.getElementById('plateAvailable').style.display = 'none';
+                            document.getElementById('plateExists').style.display = 'block';
+                            resultContainer.style.display = 'block';
+                            isPlateAvailable = false;
+                        } else {
+                            // Plate is available
+                            document.getElementById('plateAvailable').style.display = 'block';
+                            document.getElementById('plateExists').style.display = 'none';
+                            resultContainer.style.display = 'block';
+                            isPlateAvailable = true;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking plate:', error);
+                    hidePlateCheckResult();
+                });
+        }
+
+        function hidePlateCheckResult() {
+            document.getElementById('plateCheckResult').style.display = 'none';
+            isPlateAvailable = false;
+        }
+
+        // ==============================
+        // FORM VALIDATION
+        // ==============================
+        function validateForm() {
+            const isValidCategory = !!selectedCategory;
+            const isValidNama = validateNama();
+            const isValidNpmNip = validateNpmNip();
+            const isValidTelepon = validateTelepon();
+            const isValidEmail = validateEmail();
+            const isValidPlatNomor = validatePlatNomor();
+            const isValidMerkModel = validateMerkModel();
+            const isValidWarna = validateWarna();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            
+            let isValid = isValidCategory && isValidNama && isValidTelepon && 
+                         isValidEmail && isValidPlatNomor && isValidMerkModel && 
+                         isValidWarna;
+            
+            // Untuk non-tamu, NPM/NIP juga harus valid
+            if (selectedCategory !== 'Tamu') {
+                isValid = isValid && isValidNpmNip;
+            }
+            
+            // Check plate availability
+            if (!isPlateAvailable && document.getElementById('plat_nomor').value.trim().length >= 5) {
+                isValid = false;
+            }
+            
+            // Enable/disable submit button
+            submitBtn.disabled = !isValid;
+            
+            return isValid;
+        }
+
+        // ==============================
+        // FORM SUBMISSION
+        // ==============================
+        function handleFormSubmission(event) {
+            event.preventDefault();
+            
+            if (!validateForm()) {
+                alert('Harap perbaiki error pada form sebelum submit');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            
+            // Update button state
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>MEMPROSES...';
+            submitBtn.disabled = true;
+            
+            // Prepare form data
+            const formData = {
+                nama: document.getElementById('nama').value.trim(),
+                npm_nip: document.getElementById('npm_nip').value.trim() || null,
+                kategori: selectedCategory,
+                no_telp: document.getElementById('no_telp').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                plat_nomor: document.getElementById('plat_nomor').value.trim().toUpperCase(),
+                merk_model: document.getElementById('merk_model').value.trim(),
+                warna: document.getElementById('warna').value.trim()
+            };
+            
+            // Send registration request
+            fetch('/api/register_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // TAMPILKAN POPUP SUKSES
+                    showSuccessPopup(data);
+                    resetForm();
+                } else {
+                    showRegistrationError(data.message);
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                showRegistrationError('Error koneksi: ' + error);
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            });
+        }
+
+        // ==============================
+        // SUCCESS POPUP FUNCTIONS
+        // ==============================
+        function showSuccessPopup(data) {
+            // Update success message
+            document.getElementById('successMessage').textContent = data.message;
+            
+            // Show popup and overlay
+            document.getElementById('successPopup').style.display = 'block';
+            document.getElementById('successPopupOverlay').style.display = 'block';
+        }
+
+        function closeSuccessPopup() {
+            // Hide popup and overlay
+            document.getElementById('successPopup').style.display = 'none';
+            document.getElementById('successPopupOverlay').style.display = 'none';
+            
+            // Reset form setelah popup ditutup
+            resetForm();
+        }
+
+        function showRegistrationError(message) {
+            const resultContainer = document.getElementById('registrationResult');
+            resultContainer.innerHTML = `
+                <div class="alert alert-danger error-alert">
+                    <h5><i class="fas fa-times-circle me-2"></i>REGISTRASI GAGAL</h5>
+                    <p class="mb-0">${message}</p>
+                </div>
+            `;
+            resultContainer.style.display = 'block';
+            
+            // Scroll to result
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ==============================
+        // FORM RESET
+        // ==============================
+        function resetForm() {
+            // Reset form values
+            document.getElementById('registrationForm').reset();
+            
+            // Reset category selection
+            selectedCategory = '';
+            document.querySelectorAll('.category-card').forEach(c => {
+                c.classList.remove('selected');
+            });
+            
+            // Reset plate check
+            hidePlateCheckResult();
+            isPlateAvailable = false;
+            
+            // Reset form requirements
+            document.getElementById('npmNipLabel').innerHTML = 'NPM/NIP <span class="text-danger">*</span>';
+            document.getElementById('npmNipHelp').textContent = 'Wajib angka untuk Mahasiswa, Dosen, dan Staff';
+            
+            // Hide category error
+            document.getElementById('categoryError').style.display = 'none';
+            
+            // Hide result
+            document.getElementById('registrationResult').style.display = 'none';
+            
+            // Clear all error messages
+            document.querySelectorAll('.error-message').forEach(el => {
+                el.textContent = '';
+            });
+            
+            // Disable submit button
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+    </script>
+</body>
+</html>

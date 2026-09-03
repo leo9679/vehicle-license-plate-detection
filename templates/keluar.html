@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keluar - Sistem Parkir UTY</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        .live-camera-main {
+            width: 100%;
+            max-width: 640px;
+            height: 480px;
+            object-fit: cover;
+            border: 3px solid #007bff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .gate-status {
+            transition: all 0.3s ease;
+        }
+        
+        .gate-open {
+            color: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .gate-closed {
+            color: #dc3545;
+        }
+        
+        .btn-action {
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+        }
+        
+        .status-badge {
+            font-size: 0.8rem;
+        }
+        
+        .camera-overlay {
+            position: relative;
+        }
+        
+        .camera-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .active-entry-card {
+            border-left: 4px solid #198754;
+        }
+        
+        .duration-badge {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .search-result {
+            border-left: 4px solid #198754;
+        }
+        
+        .search-error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .no-active-entry {
+            border-left: 4px solid #6c757d;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- ==============================
+         HEADER SECTION
+    ============================== -->
+    <header class="bg-warning text-dark shadow-sm">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">
+                                <i class="fas fa-sign-out-alt me-2"></i>
+                                HALAMAN KELUAR KENDARAAN
+                            </h1>
+                            <p class="mb-0 opacity-75">Proses verifikasi dan pencatatan keluar kendaraan</p>
+                        </div>
+                        <a href="{{ url_for('index') }}" class="btn btn-dark">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==============================
+         MAIN CONTENT SECTION
+    ============================== -->
+    <main class="container-fluid py-4">
+        <div class="row g-4">
+            
+            <!-- ====================
+                 LEFT COLUMN - CAMERA & CONTROLS
+            ==================== -->
+            <div class="col-12 col-lg-8">
+                
+                <!-- Camera Stream Card -->
+                <section class="card shadow-sm card-hover">
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <i class="fas fa-video me-2"></i>
+                        <h5 class="mb-0 flex-grow-1">KAMERA DETEKSI PLAT NOMOR</h5>
+                        <span class="badge bg-light text-primary status-badge">
+                            <i class="fas fa-circle me-1"></i> LIVE
+                        </span>
+                    </div>
+                    <div class="card-body text-center p-3">
+                        <div class="camera-overlay">
+                            <img src="{{ url_for('video_feed') }}" 
+                                 class="live-camera-main shadow" 
+                                 alt="Live Camera Feed"
+                                 onerror="handleCameraError(this)">
+                            <div class="camera-status">
+                                <i class="fas fa-circle text-success me-1"></i>Deteksi Aktif
+                            </div>
+                        </div>
+                        <div id="cameraError" class="alert alert-warning mt-3" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Kamera tidak dapat diakses. Pastikan kamera terhubung dengan benar.
+                        </div>
+                        <p class="text-muted mt-2 small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Sistem secara otomatis mendeteksi plat nomor untuk proses keluar
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Control Buttons Section -->
+                <section class="row g-3 mt-2">
+                    <div class="col-12 col-md-6">
+                        <button id="detectExitBtn" class="btn btn-warning w-100 btn-action shadow">
+                            <i class="fas fa-camera me-2"></i>
+                            DETEKSI & PROSES KELUAR
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <button id="manualExitBtn" class="btn btn-danger w-100 btn-action shadow" 
+                                data-bs-toggle="modal" data-bs-target="#manualExitModal">
+                            <i class="fas fa-user-cog me-2"></i>
+                            VERIFIKASI MANUAL
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Results Section -->
+                <section class="card shadow-sm mt-4 card-hover">
+                    <div class="card-header bg-info text-white d-flex align-items-center">
+                        <i class="fas fa-list-alt me-2"></i>
+                        <h5 class="mb-0">HASIL VERIFIKASI KELUAR</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="exitResultContainer">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-car-side fa-3x mb-3 opacity-50"></i>
+                                <p class="mb-0">Hasil verifikasi keluar akan muncul di sini</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ====================
+                 RIGHT COLUMN - INFO PANELS
+            ==================== -->
+            <div class="col-12 col-lg-4">
+                
+                <!-- Active Entry Info Card -->
+                <section class="card shadow-sm card-hover active-entry-card">
+                    <div class="card-header bg-success text-white d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <h5 class="mb-0">INFO AKTIFITAS AKTIF</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="activeEntryInfo">
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-parking fa-2x mb-2 opacity-50"></i>
+                                <p class="mb-0 small">Tidak ada aktifitas aktif</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Gate Status Card -->
+                <section class="card shadow-sm card-hover mt-3">
+                    <div class="card-header bg-secondary text-white d-flex align-items-center">
+                        <i class="fas fa-gate me-2"></i>
+                        <h5 class="mb-0">STATUS PALANG</h5>
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <div id="gateStatus" class="gate-status gate-closed">
+                            <i class="fas fa-lock fa-3x mb-3"></i>
+                            <h5 class="mb-1">PALANG TERTUTUP</h5>
+                            <p class="text-muted small mb-0">Menunggu verifikasi keluar</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Info Card -->
+                <section class="card shadow-sm card-hover mt-3">
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <i class="fas fa-question-circle me-2"></i>
+                        <h5 class="mb-0">PANDUAN KELUAR</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-warning">
+                                <i class="fas fa-robot me-1"></i>Deteksi Otomatis
+                            </h6>
+                            <ul class="small text-muted mb-0 ps-3">
+                                <li>Plat terdeteksi otomatis oleh sistem YOLO</li>
+                                <li>Verifikasi aktifitas masuk aktif</li>
+                                <li>Palang terbuka otomatis jika valid</li>
+                                <li><strong>Hanya kendaraan yang sedang parkir bisa keluar</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h6 class="text-danger">
+                                <i class="fas fa-user-cog me-1"></i>Verifikasi Manual
+                            </h6>
+                            <ul class="small text-muted mb-0 ps-3">
+                                <li>Untuk kasus deteksi gagal</li>
+                                <li>Input manual plat nomor</li>
+                                <li>Wajib mengisi keterangan/alasan</li>
+                                <li><strong>Plat format: AB1234CD (TANPA SPASI)</strong></li>
+                                <li>Override untuk kasus khusus</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Actions Card -->
+                <section class="card shadow-sm card-hover mt-3">
+                    <div class="card-header bg-warning text-dark d-flex align-items-center">
+                        <i class="fas fa-bolt me-2"></i>
+                        <h5 class="mb-0">AKSI CEPAT</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('registrasi') }}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-user-plus me-1"></i>Registrasi Baru
+                            </a>
+                            <a href="{{ url_for('masuk') }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-sign-in-alt me-1"></i>Ke Halaman Masuk
+                            </a>
+                            <a href="{{ url_for('riwayat') }}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-history me-1"></i>Lihat Riwayat
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- ==============================
+         MANUAL EXIT MODAL
+    ============================== -->
+    <div class="modal fade" id="manualExitModal" tabindex="-1" aria-labelledby="manualExitModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                
+                <!-- Modal Header -->
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="manualExitModalLabel">
+                        <i class="fas fa-user-cog me-2"></i>
+                        VERIFIKASI MANUAL KELUAR
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    
+                    <!-- Info Alert -->
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Masukkan plat nomor dan keterangan untuk proses keluar manual.
+                        <strong>Hanya kendaraan yang sedang parkir yang bisa keluar.</strong>
+                    </div>
+
+                    <!-- Manual Exit Form -->
+                    <form id="manualExitForm">
+                        
+                        <!-- Plate Number Input -->
+                        <div class="mb-4">
+                            <label for="manualExitPlate" class="form-label fw-bold">
+                                PLAT NOMOR <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="manualExitPlate" 
+                                   placeholder="Contoh: AB1234CD" 
+                                   required
+                                   oninput="validateExitForm()"
+                                   style="text-transform: uppercase;">
+                            <div class="form-text">
+                                Masukkan plat nomor kendaraan yang akan keluar. Format: TANPA SPASI
+                            </div>
+                        </div>
+
+                        <!-- Auto-detected User Info -->
+                        <div id="exitUserInfo" class="mb-4" style="display: none;">
+                            <div class="alert alert-success search-result">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Data kendaraan ditemukan</strong>
+                            </div>
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title text-success" id="exitUserName"></h6>
+                                    <p class="card-text mb-1 small" id="exitUserNpm"></p>
+                                    <p class="card-text mb-1 small" id="exitUserKategori"></p>
+                                    <p class="card-text mb-0 small" id="exitUserPlat"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User Not Found -->
+                        <div id="exitUserNotFound" class="mb-4" style="display: none;">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Kendaraan tidak terdaftar</strong> - Akan dicatat sebagai tamu/override
+                            </div>
+                        </div>
+
+                        <!-- Reason/Description Input -->
+                        <div class="mb-4">
+                            <label for="manualExitKeterangan" class="form-label fw-bold">
+                                KETERANGAN/ALASAN <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" 
+                                      id="manualExitKeterangan" 
+                                      rows="3" 
+                                      required 
+                                      placeholder="Contoh: Kendaraan tamu, kendaraan service, sistem error, dll."
+                                      oninput="validateExitForm()"></textarea>
+                            <div class="form-text">
+                                Wajib diisi untuk mencatat alasan verifikasi manual
+                            </div>
+                        </div>
+
+                        <!-- Active Entry Info -->
+                        <div id="activeExitInfo" class="mb-3" style="display: none;">
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Kendaraan sedang parkir - Bisa diproses keluar</strong>
+                            </div>
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <p class="card-text mb-1 small" id="activeExitTime"></p>
+                                    <p class="card-text mb-0 small" id="activeExitDuration"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No Active Entry Warning -->
+                        <div id="noActiveExitInfo" class="mb-3" style="display: none;">
+                            <div class="alert alert-warning no-active-entry">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Tidak ada aktifitas masuk aktif</strong> - Akan dicatat sebagai override exit
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>BATAL
+                    </button>
+                    <button type="button" class="btn btn-danger" id="submitManualExit" disabled>
+                        <i class="fas fa-check me-1"></i>PROSES KELUAR
+                    </button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==============================
+        // VARIABEL GLOBAL
+        // ==============================
+        let exitUserData = null;
+        let activeExitData = null;
+        let hasActiveEntry = false;
+
+        // ==============================
+        // EVENT LISTENERS
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Automatic exit button
+            document.getElementById('detectExitBtn').addEventListener('click', processAutomaticExit);
+            
+            // Manual exit submission
+            document.getElementById('submitManualExit').addEventListener('click', processManualExit);
+            
+            // Real-time plate search
+            document.getElementById('manualExitPlate').addEventListener('input', handlePlateInput);
+            
+            // Form validation
+            document.getElementById('manualExitKeterangan').addEventListener('input', validateExitForm);
+            
+            // Load active entries on page load
+            updateActiveEntryInfo();
+        });
+
+        // ==============================
+        // MAIN FUNCTIONS
+        // ==============================
+        function processAutomaticExit() {
+            const btn = document.getElementById('detectExitBtn');
+            const originalText = btn.innerHTML;
+            
+            // Update button state
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>MEMPROSES...';
+            btn.disabled = true;
+
+            // Send request to server
+            fetch('/verify_exit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showExitResult(data);
+                if (data.success) {
+                    triggerGateAnimation();
+                    updateActiveEntryInfo(); // Refresh info aktifitas aktif
+                }
+            })
+            .catch(error => {
+                showExitResult({
+                    success: false, 
+                    message: 'Error koneksi: ' + error
+                });
+            })
+            .finally(() => {
+                // Restore button state
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        function processManualExit() {
+            const btn = document.getElementById('submitManualExit');
+            const originalText = btn.innerHTML;
+            
+            // Update button state
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>MEMPROSES...';
+            btn.disabled = true;
+
+            // Prepare form data
+            const formData = {
+                action_type: 'keluar',
+                plat_nomor: document.getElementById('manualExitPlate').value.trim().toUpperCase(),
+                keperluan: document.getElementById('manualExitKeterangan').value.trim()
+            };
+
+            // Send request to server
+            fetch('/manual_verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showExitResult(data);
+                    triggerGateAnimation();
+                    updateActiveEntryInfo(); // Refresh info aktifitas aktif
+                    
+                    // Close modal after success
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('manualExitModal'));
+                        modal.hide();
+                        resetExitModal();
+                    }, 2000);
+                } else {
+                    showError('ERROR: ' + data.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                showError('ERROR: ' + error);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        // ==============================
+        // VALIDATION & SEARCH FUNCTIONS
+        // ==============================
+        function handlePlateInput() {
+            const plateInput = document.getElementById('manualExitPlate');
+            let plateNumber = plateInput.value.trim().toUpperCase();
+            
+            // HAPUS SEMUA SPASI DARI INPUT
+            plateNumber = plateNumber.replace(/\s+/g, '');
+            plateInput.value = plateNumber;
+            
+            if (plateNumber.length >= 5) {
+                searchExitUserByPlate(plateNumber);
+                checkActiveExit(plateNumber);
+            } else {
+                hideExitUserInfo();
+                hideActiveExitInfo();
+                validateExitForm();
+            }
+        }
+
+        function validateExitForm() {
+            const plate = document.getElementById('manualExitPlate').value.trim();
+            const keterangan = document.getElementById('manualExitKeterangan').value.trim();
+            
+            document.getElementById('submitManualExit').disabled = !(plate && keterangan);
+        }
+
+        function searchExitUserByPlate(plateNumber) {
+            fetch(`/api/search_user?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.user) {
+                        exitUserData = data.user;
+                        showExitUserInfo(data.user);
+                    } else {
+                        hideExitUserInfo();
+                        exitUserData = null;
+                        // Tampilkan info kendaraan tidak terdaftar
+                        document.getElementById('exitUserNotFound').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching user:', error);
+                    hideExitUserInfo();
+                    exitUserData = null;
+                });
+        }
+
+        function checkActiveExit(plateNumber) {
+            // Simulasi checking active entry
+            // Di implementasi nyata, ini akan memanggil endpoint API
+            console.log('Checking active exit for:', plateNumber);
+            
+            // Untuk demo, kita anggap ada active entry jika plat panjangnya cukup
+            if (plateNumber.length >= 5) {
+                // Simulasi data active entry
+                const mockActiveEntry = {
+                    waktu_masuk: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+                    durasi_menit: 120
+                };
+                
+                activeExitData = mockActiveEntry;
+                hasActiveEntry = true;
+                showActiveExitInfo(mockActiveEntry);
+            } else {
+                hideActiveExitInfo();
+                activeExitData = null;
+                hasActiveEntry = false;
+            }
+        }
+
+        // ==============================
+        // UI UPDATE FUNCTIONS
+        // ==============================
+        function showExitUserInfo(user) {
+            const container = document.getElementById('exitUserInfo');
+            const notFoundContainer = document.getElementById('exitUserNotFound');
+            
+            container.style.display = 'block';
+            notFoundContainer.style.display = 'none';
+            
+            document.getElementById('exitUserName').textContent = `Nama: ${user.nama}`;
+            document.getElementById('exitUserNpm').textContent = user.npm_nip ? `NPM/NIP: ${user.npm_nip}` : '';
+            document.getElementById('exitUserKategori').textContent = `Kategori: ${user.kategori}`;
+            document.getElementById('exitUserPlat').textContent = `Plat: ${user.plat_nomor}`;
+        }
+
+        function hideExitUserInfo() {
+            document.getElementById('exitUserInfo').style.display = 'none';
+            document.getElementById('exitUserNotFound').style.display = 'none';
+        }
+
+        function showActiveExitInfo(activeEntry) {
+            const container = document.getElementById('activeExitInfo');
+            const noActiveContainer = document.getElementById('noActiveExitInfo');
+            
+            container.style.display = 'block';
+            noActiveContainer.style.display = 'none';
+            
+            const masukTime = new Date(activeEntry.waktu_masuk);
+            const now = new Date();
+            const duration = calculateDuration(masukTime, now);
+            
+            document.getElementById('activeExitTime').textContent = `Waktu Masuk: ${masukTime.toLocaleString()}`;
+            document.getElementById('activeExitDuration').textContent = `Durasi: ${duration}`;
+        }
+
+        function hideActiveExitInfo() {
+            const container = document.getElementById('activeExitInfo');
+            const noActiveContainer = document.getElementById('noActiveExitInfo');
+            
+            container.style.display = 'none';
+            
+            // Tampilkan warning jika plat sudah diisi tapi tidak ada active entry
+            const plate = document.getElementById('manualExitPlate').value.trim();
+            if (plate.length >= 5) {
+                noActiveContainer.style.display = 'block';
+            } else {
+                noActiveContainer.style.display = 'none';
+            }
+        }
+
+        function showExitResult(data) {
+            const container = document.getElementById('exitResultContainer');
+            
+            if (data.success) {
+                let content = `
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle me-2"></i>KELUAR BERHASIL</h5>
+                        <p class="mb-2">${data.message}</p>
+                        <hr>
+                        <div class="row small">
+                            <div class="col-6">
+                                <strong>Plat:</strong><br>${data.detected_plate || data.user_info?.plat_nomor}
+                            </div>
+                `;
+
+                if (data.user_info) {
+                    content += `
+                            <div class="col-6">
+                                <strong>Pengguna:</strong><br>${data.user_info.nama} (${data.user_info.kategori})
+                            </div>
+                    `;
+                }
+
+                if (data.entry_info) {
+                    const masukTime = new Date(data.entry_info.waktu_masuk);
+                    const keluarTime = new Date();
+                    const duration = calculateDuration(masukTime, keluarTime);
+                    
+                    content += `
+                            <div class="col-6 mt-2">
+                                <strong>Waktu Masuk:</strong><br>${masukTime.toLocaleString()}
+                            </div>
+                            <div class="col-6 mt-2">
+                                <strong>Durasi:</strong><br>${duration}
+                            </div>
+                    `;
+                }
+
+                if (data.confidence) {
+                    content += `
+                            <div class="col-12 mt-2">
+                                <strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%
+                            </div>
+                    `;
+                }
+
+                if (data.log_id) {
+                    content += `
+                            <div class="col-12 mt-2">
+                                <strong>ID Log:</strong> ${data.log_id}
+                            </div>
+                    `;
+                }
+
+                content += `</div></div>`;
+                container.innerHTML = content;
+                
+            } else {
+                let content = `
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-times-circle me-2"></i>GAGAL VERIFIKASI</h5>
+                        <p class="mb-2">${data.message}</p>
+                        <p class="mb-1"><strong>Plat Terdeteksi:</strong> ${data.detected_plate || '-'}</p>
+                    </div>
+                `;
+
+                if (data.need_manual_verify) {
+                    content += `
+                        <div class="alert alert-warning mt-2">
+                            <p class="mb-2">Sistem merekomendasikan verifikasi manual.</p>
+                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#manualExitModal">
+                                <i class="fas fa-user-cog me-1"></i>Verifikasi Manual
+                            </button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = content;
+            }
+        }
+
+        function updateActiveEntryInfo() {
+            // Di implementasi nyata, ini akan fetch data dari API
+            // Untuk demo, kita tampilkan pesan default
+            const container = document.getElementById('activeEntryInfo');
+            container.innerHTML = `
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-parking fa-2x mb-2 opacity-50"></i>
+                    <p class="mb-0 small">Tidak ada aktifitas aktif</p>
+                    <small class="text-muted">Refresh halaman untuk update data terbaru</small>
+                </div>
+            `;
+        }
+
+        function triggerGateAnimation() {
+            const gateStatus = document.getElementById('gateStatus');
+            gateStatus.innerHTML = `
+                <i class="fas fa-unlock fa-3x mb-3"></i>
+                <h5 class="mb-1">PALANG TERBUKA</h5>
+                <p class="text-success small mb-0">Kendaraan dapat keluar</p>
+            `;
+            gateStatus.className = 'gate-status gate-open';
+            
+            setTimeout(() => {
+                gateStatus.innerHTML = `
+                    <i class="fas fa-lock fa-3x mb-3"></i>
+                    <h5 class="mb-1">PALANG TERTUTUP</h5>
+                    <p class="text-muted small mb-0">Menunggu verifikasi keluar</p>
+                `;
+                gateStatus.className = 'gate-status gate-closed';
+            }, 5000);
+        }
+
+        // ==============================
+        // UTILITY FUNCTIONS
+        // ==============================
+        function resetExitModal() {
+            document.getElementById('manualExitPlate').value = '';
+            document.getElementById('manualExitKeterangan').value = '';
+            document.getElementById('submitManualExit').disabled = true;
+            hideExitUserInfo();
+            hideActiveExitInfo();
+            exitUserData = null;
+            activeExitData = null;
+            hasActiveEntry = false;
+        }
+
+        function calculateDuration(startTime, endTime) {
+            const diffMs = endTime - startTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHrs = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            
+            if (diffHrs > 0) {
+                return `${diffHrs} jam ${mins} menit`;
+            } else {
+                return `${mins} menit`;
+            }
+        }
+
+        function handleCameraError(imgElement) {
+            imgElement.style.display = 'none';
+            document.getElementById('cameraError').style.display = 'block';
+        }
+
+        function showError(message) {
+            alert(message);
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk - Sistem Parkir UTY</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        .live-camera-main {
+            width: 100%;
+            max-width: 640px;
+            height: 480px;
+            object-fit: cover;
+            border: 3px solid #007bff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .gate-status {
+            transition: all 0.3s ease;
+        }
+        
+        .gate-open {
+            color: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .gate-closed {
+            color: #dc3545;
+        }
+        
+        .btn-action {
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+        }
+        
+        .category-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .category-card.active {
+            border-width: 3px !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .status-badge {
+            font-size: 0.8rem;
+        }
+        
+        .step-indicator {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .camera-overlay {
+            position: relative;
+        }
+        
+        .camera-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .search-result {
+            border-left: 4px solid #198754;
+        }
+        
+        .search-error {
+            border-left: 4px solid #dc3545;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- ==============================
+         HEADER SECTION
+    ============================== -->
+    <header class="bg-success text-white shadow-sm">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">
+                                <i class="fas fa-sign-in-alt me-2"></i>
+                                HALAMAN MASUK KENDARAAN
+                            </h1>
+                            <p class="mb-0 opacity-75">Proses verifikasi dan pencatatan masuk kendaraan</p>
+                        </div>
+                        <a href="{{ url_for('index') }}" class="btn btn-light">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==============================
+         MAIN CONTENT SECTION
+    ============================== -->
+    <main class="container-fluid py-4">
+        <div class="row g-4">
+            
+            <!-- ====================
+                 LEFT COLUMN - CAMERA & CONTROLS
+            ==================== -->
+            <div class="col-12 col-lg-8">
+                
+                <!-- Camera Stream Card -->
+                <section class="card shadow-sm card-hover">
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <i class="fas fa-video me-2"></i>
+                        <h5 class="mb-0 flex-grow-1">KAMERA DETEKSI PLAT NOMOR</h5>
+                        <span class="badge bg-light text-primary status-badge">
+                            <i class="fas fa-circle me-1"></i> LIVE
+                        </span>
+                    </div>
+                    <div class="card-body text-center p-3">
+                        <div class="camera-overlay">
+                            <img src="{{ url_for('video_feed') }}" 
+                                 class="live-camera-main shadow" 
+                                 alt="Live Camera Feed"
+                                 onerror="handleCameraError(this)">
+                            <div class="camera-status">
+                                <i class="fas fa-circle text-success me-1"></i>Deteksi Aktif
+                            </div>
+                        </div>
+                        <div id="cameraError" class="alert alert-warning mt-3" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Kamera tidak dapat diakses. Pastikan kamera terhubung dengan benar.
+                        </div>
+                        <p class="text-muted mt-2 small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Sistem secara otomatis mendeteksi plat nomor untuk proses masuk
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Control Buttons Section -->
+                <section class="row g-3 mt-2">
+                    <div class="col-12 col-md-6">
+                        <button id="detectBtn" class="btn btn-success w-100 btn-action shadow">
+                            <i class="fas fa-camera me-2"></i>
+                            DETEKSI & PROSES MASUK
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <button id="manualBtn" class="btn btn-warning w-100 btn-action shadow" 
+                                data-bs-toggle="modal" data-bs-target="#manualModal">
+                            <i class="fas fa-user-cog me-2"></i>
+                            VERIFIKASI MANUAL
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Results Section -->
+                <section class="card shadow-sm mt-4 card-hover">
+                    <div class="card-header bg-info text-white d-flex align-items-center">
+                        <i class="fas fa-list-alt me-2"></i>
+                        <h5 class="mb-0">HASIL DETEKSI MASUK</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultContainer">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-car fa-3x mb-3 opacity-50"></i>
+                                <p class="mb-0">Hasil deteksi akan muncul di sini</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ====================
+                 RIGHT COLUMN - INFO PANELS
+            ==================== -->
+            <div class="col-12 col-lg-4">
+                
+                <!-- Gate Status Card -->
+                <section class="card shadow-sm card-hover">
+                    <div class="card-header bg-secondary text-white d-flex align-items-center">
+                        <i class="fas fa-gate me-2"></i>
+                        <h5 class="mb-0">STATUS PALANG</h5>
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <div id="gateStatus" class="gate-status gate-closed">
+                            <i class="fas fa-lock fa-3x mb-3"></i>
+                            <h5 class="mb-1">PALANG TERTUTUP</h5>
+                            <p class="text-muted small mb-0">Menunggu verifikasi masuk</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Info Card -->
+                <section class="card shadow-sm card-hover mt-3">
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <i class="fas fa-question-circle me-2"></i>
+                        <h5 class="mb-0">PANDUAN MASUK</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-success">
+                                <i class="fas fa-robot me-1"></i>Deteksi Otomatis
+                            </h6>
+                            <ul class="small text-muted mb-0 ps-3">
+                                <li>Plat terdeteksi otomatis oleh sistem YOLO</li>
+                                <li>Verifikasi data di database</li>
+                                <li>Palang terbuka otomatis jika terdaftar</li>
+                                <li><strong>Cegah double entry</strong> - kendaraan yang sedang parkir tidak bisa masuk lagi</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h6 class="text-warning">
+                                <i class="fas fa-user-cog me-1"></i>Verifikasi Manual
+                            </h6>
+                            <ul class="small text-muted mb-0 ps-3">
+                                <li>Untuk kasus deteksi gagal</li>
+                                <li>Pilih kategori kendaraan</li>
+                                <li>Input data sesuai kebutuhan</li>
+                                <li><strong>Plat format: AB1234CD (TANPA SPASI)</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Actions Card -->
+                <section class="card shadow-sm card-hover mt-3">
+                    <div class="card-header bg-success text-white d-flex align-items-center">
+                        <i class="fas fa-bolt me-2"></i>
+                        <h5 class="mb-0">AKSI CEPAT</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('registrasi') }}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-user-plus me-1"></i>Registrasi Baru
+                            </a>
+                            <a href="{{ url_for('keluar') }}" class="btn btn-outline-warning btn-sm">
+                                <i class="fas fa-sign-out-alt me-1"></i>Ke Halaman Keluar
+                            </a>
+                            <a href="{{ url_for('riwayat') }}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-history me-1"></i>Lihat Riwayat
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- ==============================
+         MANUAL VERIFICATION MODAL
+    ============================== -->
+    <div class="modal fade" id="manualModal" tabindex="-1" aria-labelledby="manualModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                
+                <!-- Modal Header -->
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="manualModalLabel">
+                        <i class="fas fa-user-cog me-2"></i>
+                        VERIFIKASI MANUAL MASUK
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    
+                    <!-- Step 1: Category Selection -->
+                    <div id="step1">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-muted mb-0 step-indicator">STEP 1: PILIH KATEGORI</h6>
+                            <span class="badge bg-warning">Wajib</span>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <!-- Mahasiswa Card -->
+                            <div class="col-12 col-md-4">
+                                <div class="card h-100 border-primary category-card" data-category="Mahasiswa">
+                                    <div class="card-body text-center p-3">
+                                        <i class="fas fa-graduation-cap fa-2x text-primary mb-2"></i>
+                                        <h6 class="card-title fw-bold">MAHASISWA</h6>
+                                        <small class="text-muted">Kendaraan terdaftar</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Dosen Card -->
+                            <div class="col-12 col-md-4">
+                                <div class="card h-100 border-success category-card" data-category="Dosen">
+                                    <div class="card-body text-center p-3">
+                                        <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
+                                        <h6 class="card-title fw-bold">DOSEN</h6>
+                                        <small class="text-muted">Kendaraan terdaftar</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Staff Card -->
+                            <div class="col-12 col-md-4">
+                                <div class="card h-100 border-info category-card" data-category="Staff">
+                                    <div class="card-body text-center p-3">
+                                        <i class="fas fa-user-tie fa-2x text-info mb-2"></i>
+                                        <h6 class="card-title fw-bold">STAFF</h6>
+                                        <small class="text-muted">Kendaraan terdaftar</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tamu Card -->
+                            <div class="col-12 col-md-6">
+                                <div class="card h-100 border-warning category-card" data-category="Tamu">
+                                    <div class="card-body text-center p-3">
+                                        <i class="fas fa-users fa-2x text-warning mb-2"></i>
+                                        <h6 class="card-title fw-bold">TAMU</h6>
+                                        <small class="text-muted">Kendaraan tidak terdaftar</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Form Input -->
+                    <div id="step2" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 id="step2Title" class="text-muted mb-0 step-indicator"></h6>
+                            <span class="badge bg-info">Step 2/2</span>
+                        </div>
+                        
+                        <!-- Form for Registered Users (Mahasiswa, Dosen, Staff) -->
+                        <div id="formTerdaftar" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <span id="infoTerdaftar">Masukkan plat nomor kendaraan terdaftar</span>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="manualPlateTerdaftar" class="form-label fw-bold">
+                                    PLAT NOMOR <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control form-control-lg" 
+                                       id="manualPlateTerdaftar" 
+                                       placeholder="Contoh: AB1234CD" 
+                                       required
+                                       oninput="validatePlatTerdaftar()"
+                                       style="text-transform: uppercase;">
+                                <div class="form-text">
+                                    Plat nomor harus sudah terdaftar di sistem untuk kategori ini. Format: TANPA SPASI
+                                </div>
+                            </div>
+
+                            <!-- Search Results -->
+                            <div id="searchResult" class="mt-3" style="display: none;">
+                                <div class="alert alert-success search-result">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <strong id="searchResultText">Data ditemukan di database</strong>
+                                </div>
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-success" id="userName"></h6>
+                                        <p class="card-text mb-1 small" id="userNpm"></p>
+                                        <p class="card-text mb-1 small" id="userKategori"></p>
+                                        <p class="card-text mb-0 small" id="userPlat"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Error Results -->
+                            <div id="searchError" class="mt-3" style="display: none;">
+                                <div class="alert alert-danger search-error">
+                                    <i class="fas fa-times-circle me-2"></i>
+                                    <strong id="searchErrorText">Data tidak ditemukan</strong>
+                                </div>
+                            </div>
+
+                            <!-- Active Entry Warning -->
+                            <div id="activeEntryWarning" class="mt-3" style="display: none;">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Peringatan:</strong> Kendaraan ini masih berada di dalam area parkir
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form for Tamu -->
+                        <div id="formTamu" style="display: none;">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>TAMU WAJIB MENGISI SEMUA DATA BERIKUT</strong>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="manualPlateTamu" class="form-label fw-bold">
+                                    PLAT NOMOR <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="manualPlateTamu" 
+                                       placeholder="Contoh: AB1234CD" 
+                                       required
+                                       oninput="validateTamuForm()"
+                                       style="text-transform: uppercase;">
+                                <div class="form-text">Format: Huruf-Angka-Huruf TANPA SPASI</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="manualNamaTamu" class="form-label fw-bold">
+                                    NAMA LENGKAP <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="manualNamaTamu" 
+                                       placeholder="Nama lengkap tamu" 
+                                       required
+                                       oninput="validateTamuForm()">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="manualKeperluanTamu" class="form-label fw-bold">
+                                    KEPERLUAN <span class="text-danger">*</span>
+                                </label>
+                                <textarea class="form-control" 
+                                          id="manualKeperluanTamu" 
+                                          rows="2" 
+                                          placeholder="Jelaskan keperluan kunjungan (Meeting, Kunjungan, Urusan Administrasi, dll.)" 
+                                          required
+                                          oninput="validateTamuForm()"></textarea>
+                                <div class="form-text">
+                                    Wajib diisi untuk pencatatan keperluan kunjungan
+                                </div>
+                            </div>
+
+                            <!-- Plat Check untuk Tamu -->
+                            <div id="tamuPlateCheck" class="mt-3" style="display: none;">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong id="tamuPlateMessage">Plat ini sudah terdaftar sebagai pengguna lain</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <!-- Step 1 Buttons -->
+                    <div id="step1Buttons">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>BATAL
+                        </button>
+                    </div>
+                    
+                    <!-- Step 2 Buttons -->
+                    <div id="step2Buttons" style="display: none;">
+                        <button type="button" class="btn btn-secondary" id="backToStep1">
+                            <i class="fas fa-arrow-left me-1"></i>KEMBALI
+                        </button>
+                        <button type="button" class="btn btn-warning" id="submitManual" disabled>
+                            <i class="fas fa-check me-1"></i>PROSES MASUK
+                        </button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==============================
+        // VARIABEL GLOBAL
+        // ==============================
+        let selectedCategory = '';
+        let userData = null;
+        let hasActiveEntry = false;
+
+        // ==============================
+        // EVENT LISTENERS
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Category selection
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.addEventListener('click', handleCategorySelection);
+            });
+            
+            // Navigation buttons
+            document.getElementById('backToStep1').addEventListener('click', showStep1);
+            document.getElementById('submitManual').addEventListener('click', processManualVerification);
+            
+            // Automatic detection
+            document.getElementById('detectBtn').addEventListener('click', processAutomaticDetection);
+        });
+
+        // ==============================
+        // MAIN FUNCTIONS
+        // ==============================
+        function handleCategorySelection(event) {
+            const card = event.currentTarget;
+            selectedCategory = card.dataset.category;
+            
+            // Reset all cards
+            document.querySelectorAll('.category-card').forEach(c => {
+                c.classList.remove('active');
+            });
+            
+            // Activate selected card
+            card.classList.add('active');
+            
+            // Proceed to step 2
+            setTimeout(() => {
+                showStep2();
+            }, 300);
+        }
+
+        function showStep1() {
+            // Show step 1, hide step 2
+            document.getElementById('step1').style.display = 'block';
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step1Buttons').style.display = 'block';
+            document.getElementById('step2Buttons').style.display = 'none';
+            
+            // Reset state
+            resetStep1();
+        }
+
+        function showStep2() {
+            // Show step 2, hide step 1
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('step1Buttons').style.display = 'none';
+            document.getElementById('step2Buttons').style.display = 'block';
+            
+            // Update step 2 title
+            document.getElementById('step2Title').textContent = `Verifikasi Manual - ${selectedCategory}`;
+            
+            // Show appropriate form
+            if (selectedCategory === 'Tamu') {
+                document.getElementById('formTamu').style.display = 'block';
+                document.getElementById('formTerdaftar').style.display = 'none';
+            } else {
+                document.getElementById('formTamu').style.display = 'none';
+                document.getElementById('formTerdaftar').style.display = 'block';
+                document.getElementById('infoTerdaftar').textContent = 
+                    `Masukkan plat nomor ${selectedCategory.toLowerCase()} yang terdaftar`;
+            }
+            
+            // Reset step 2
+            resetStep2();
+        }
+
+        function resetStep1() {
+            selectedCategory = '';
+            userData = null;
+            hasActiveEntry = false;
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.classList.remove('active');
+            });
+        }
+
+        function resetStep2() {
+            // Reset form values
+            document.getElementById('manualPlateTerdaftar').value = '';
+            document.getElementById('manualPlateTamu').value = '';
+            document.getElementById('manualNamaTamu').value = '';
+            document.getElementById('manualKeperluanTamu').value = '';
+            
+            // Reset UI states
+            document.getElementById('searchResult').style.display = 'none';
+            document.getElementById('searchError').style.display = 'none';
+            document.getElementById('activeEntryWarning').style.display = 'none';
+            document.getElementById('tamuPlateCheck').style.display = 'none';
+            document.getElementById('submitManual').disabled = true;
+            userData = null;
+            hasActiveEntry = false;
+        }
+
+        // ==============================
+        // VALIDATION FUNCTIONS
+        // ==============================
+        function validatePlatTerdaftar() {
+            const plateInput = document.getElementById('manualPlateTerdaftar');
+            let plateNumber = plateInput.value.trim().toUpperCase();
+            
+            // HAPUS SEMUA SPASI DARI INPUT
+            plateNumber = plateNumber.replace(/\s+/g, '');
+            plateInput.value = plateNumber;
+            
+            const submitBtn = document.getElementById('submitManual');
+            
+            if (plateNumber.length >= 5) {
+                searchUserByPlate(plateNumber);
+                checkActiveEntry(plateNumber);
+            } else {
+                document.getElementById('searchResult').style.display = 'none';
+                document.getElementById('searchError').style.display = 'none';
+                document.getElementById('activeEntryWarning').style.display = 'none';
+                submitBtn.disabled = true;
+            }
+        }
+
+        function validateTamuForm() {
+            const plateInput = document.getElementById('manualPlateTamu');
+            let plateNumber = plateInput.value.trim().toUpperCase();
+            
+            // HAPUS SEMUA SPASI DARI INPUT
+            plateNumber = plateNumber.replace(/\s+/g, '');
+            plateInput.value = plateNumber;
+            
+            const plate = plateNumber;
+            const nama = document.getElementById('manualNamaTamu').value.trim();
+            const keperluan = document.getElementById('manualKeperluanTamu').value.trim();
+            
+            // Cek jika plat sudah terdaftar
+            if (plate.length >= 5) {
+                checkTamuPlate(plate);
+            } else {
+                document.getElementById('tamuPlateCheck').style.display = 'none';
+            }
+            
+            document.getElementById('submitManual').disabled = !(plate && nama && keperluan);
+        }
+
+        // ==============================
+        // API FUNCTIONS
+        // ==============================
+        function searchUserByPlate(plateNumber) {
+            fetch(`/api/search_user?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const searchResult = document.getElementById('searchResult');
+                    const searchError = document.getElementById('searchError');
+                    const submitBtn = document.getElementById('submitManual');
+                    
+                    if (data.success && data.user) {
+                        // Data found
+                        userData = data.user;
+                        
+                        // Validasi kategori
+                        if (userData.kategori !== selectedCategory) {
+                            showSearchError(`Plat ini terdaftar sebagai ${userData.kategori}, bukan ${selectedCategory}`);
+                            submitBtn.disabled = true;
+                            return;
+                        }
+                        
+                        showSearchResult(data.user);
+                        submitBtn.disabled = hasActiveEntry; // Disable jika ada active entry
+                    } else {
+                        // Data not found
+                        showSearchError('Data tidak ditemukan. Pastikan plat nomor sudah terdaftar untuk kategori ini.');
+                        submitBtn.disabled = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching user:', error);
+                    showSearchError('Error koneksi. Coba lagi.');
+                    document.getElementById('submitManual').disabled = true;
+                });
+        }
+
+        function checkActiveEntry(plateNumber) {
+            fetch(`/api/check_active_entry?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const activeWarning = document.getElementById('activeEntryWarning');
+                    const submitBtn = document.getElementById('submitManual');
+                    
+                    if (data.success && data.active) {
+                        // Ada active entry
+                        hasActiveEntry = true;
+                        activeWarning.style.display = 'block';
+                        submitBtn.disabled = true;
+                    } else {
+                        // Tidak ada active entry
+                        hasActiveEntry = false;
+                        activeWarning.style.display = 'none';
+                        if (userData) {
+                            submitBtn.disabled = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking active entry:', error);
+                    hasActiveEntry = false;
+                    document.getElementById('activeEntryWarning').style.display = 'none';
+                });
+        }
+
+        function checkTamuPlate(plateNumber) {
+            fetch(`/api/search_user?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const tamuPlateCheck = document.getElementById('tamuPlateCheck');
+                    
+                    if (data.success && data.user) {
+                        // Plat sudah terdaftar
+                        tamuPlateCheck.style.display = 'block';
+                        document.getElementById('tamuPlateMessage').textContent = 
+                            `Plat ini sudah terdaftar sebagai ${data.user.kategori}: ${data.user.nama}`;
+                    } else {
+                        // Plat belum terdaftar
+                        tamuPlateCheck.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking tamu plate:', error);
+                    document.getElementById('tamuPlateCheck').style.display = 'none';
+                });
+        }
+
+        function showSearchResult(user) {
+            const container = document.getElementById('searchResult');
+            const errorContainer = document.getElementById('searchError');
+            
+            container.style.display = 'block';
+            errorContainer.style.display = 'none';
+            
+            document.getElementById('userName').textContent = `Nama: ${user.nama}`;
+            document.getElementById('userNpm').textContent = user.npm_nip ? `NPM/NIP: ${user.npm_nip}` : '';
+            document.getElementById('userKategori').textContent = `Kategori: ${user.kategori}`;
+            document.getElementById('userPlat').textContent = `Plat: ${user.plat_nomor}`;
+        }
+
+        function showSearchError(message) {
+            const container = document.getElementById('searchResult');
+            const errorContainer = document.getElementById('searchError');
+            
+            container.style.display = 'none';
+            errorContainer.style.display = 'block';
+            document.getElementById('searchErrorText').textContent = message;
+        }
+
+        // ==============================
+        // PROCESSING FUNCTIONS
+        // ==============================
+        function processManualVerification() {
+            const btn = document.getElementById('submitManual');
+            const originalText = btn.innerHTML;
+            
+            // Update button state
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>MEMPROSES...';
+            btn.disabled = true;
+
+            // Prepare form data
+            let formData = {
+                action_type: 'masuk',
+                kategori: selectedCategory
+            };
+
+            if (selectedCategory === 'Tamu') {
+                // Tamu data - all fields required
+                formData.plat_nomor = document.getElementById('manualPlateTamu').value.trim().toUpperCase();
+                formData.nama = document.getElementById('manualNamaTamu').value.trim();
+                formData.keperluan = document.getElementById('manualKeperluanTamu').value.trim();
+                formData.npm_nip = null;
+            } else {
+                // Registered user data
+                formData.plat_nomor = document.getElementById('manualPlateTerdaftar').value.trim().toUpperCase();
+                formData.nama = userData ? userData.nama : '';
+                formData.npm_nip = userData ? userData.npm_nip : null;
+                formData.keperluan = `Verifikasi manual - ${selectedCategory}`;
+            }
+
+            // Send request to server
+            fetch('/manual_verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMainResult(data);
+                    triggerGateAnimation();
+                    
+                    // Close modal after success
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('manualModal'));
+                        modal.hide();
+                        resetModal();
+                    }, 2000);
+                } else {
+                    alert('ERROR: ' + data.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert('ERROR: ' + error);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        function processAutomaticDetection() {
+            const btn = document.getElementById('detectBtn');
+            const originalText = btn.innerHTML;
+            
+            // Update button state
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>MEMPROSES...';
+            btn.disabled = true;
+
+            // Send request to server
+            fetch('/detect_entry', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMainResult(data);
+                if (data.success) {
+                    triggerGateAnimation();
+                }
+            })
+            .catch(error => {
+                showMainResult({
+                    success: false, 
+                    message: 'Error koneksi: ' + error
+                });
+            })
+            .finally(() => {
+                // Restore button state
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        // ==============================
+        // UI UPDATE FUNCTIONS
+        // ==============================
+        function showMainResult(data) {
+            const container = document.getElementById('resultContainer');
+            
+            if (data.success) {
+                let content = `
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle me-2"></i>MASUK BERHASIL</h5>
+                        <p class="mb-2">${data.message}</p>
+                        <hr>
+                        <div class="row small">
+                            <div class="col-6">
+                                <strong>Plat:</strong><br>${data.detected_plate || data.user_info?.plat_nomor}
+                            </div>
+                            <div class="col-6">
+                                <strong>Pengguna:</strong><br>${data.user_info.nama}
+                            </div>
+                            <div class="col-6 mt-2">
+                                <strong>Kategori:</strong><br>${data.user_info.kategori}
+                            </div>
+                `;
+
+                if (data.confidence) {
+                    content += `
+                            <div class="col-6 mt-2">
+                                <strong>Confidence:</strong><br>${(data.confidence * 100).toFixed(1)}%
+                            </div>
+                    `;
+                }
+
+                if (data.entry_id) {
+                    content += `
+                            <div class="col-12 mt-2">
+                                <strong>ID aktifitas:</strong><br>${data.entry_id}
+                            </div>
+                    `;
+                }
+
+                content += `</div></div>`;
+                container.innerHTML = content;
+                
+            } else {
+                let content = `
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-times-circle me-2"></i>GAGAL VERIFIKASI</h5>
+                        <p class="mb-2">${data.message}</p>
+                        <p class="mb-1"><strong>Plat Terdeteksi:</strong> ${data.detected_plate || '-'}</p>
+                    </div>
+                `;
+
+                if (data.need_manual_verify) {
+                    content += `
+                        <div class="alert alert-warning mt-2">
+                            <p class="mb-2">Sistem merekomendasikan verifikasi manual.</p>
+                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#manualModal">
+                                <i class="fas fa-user-cog me-1"></i>Verifikasi Manual
+                            </button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = content;
+            }
+        }
+
+        function triggerGateAnimation() {
+            const gateStatus = document.getElementById('gateStatus');
+            gateStatus.innerHTML = `
+                <i class="fas fa-unlock fa-3x mb-3"></i>
+                <h5 class="mb-1">PALANG TERBUKA</h5>
+                <p class="text-success small mb-0">Kendaraan dapat masuk</p>
+            `;
+            gateStatus.className = 'gate-status gate-open';
+            
+            setTimeout(() => {
+                gateStatus.innerHTML = `
+                    <i class="fas fa-lock fa-3x mb-3"></i>
+                    <h5 class="mb-1">PALANG TERTUTUP</h5>
+                    <p class="text-muted small mb-0">Menunggu verifikasi masuk</p>
+                `;
+                gateStatus.className = 'gate-status gate-closed';
+            }, 5000);
+        }
+
+        // ==============================
+        // UTILITY FUNCTIONS
+        // ==============================
+        function resetModal() {
+            showStep1();
+            resetStep2();
+        }
+
+        function handleCameraError(imgElement) {
+            imgElement.style.display = 'none';
+            document.getElementById('cameraError').style.display = 'block';
+        }
+
+        // Simulasi API check_active_entry (harus ditambahkan di backend)
+        function checkActiveEntry(plateNumber) {
+            // Ini adalah simulasi - di implementasi nyata, panggil endpoint API
+            console.log('Checking active entry for:', plateNumber);
+            // Untuk demo, kita anggap tidak ada active entry
+            hasActiveEntry = false;
+            document.getElementById('activeEntryWarning').style.display = 'none';
+            
+            if (userData) {
+                document.getElementById('submitManual').disabled = false;
+            }
+        }
+
+    </script>
+</body>
+</html>

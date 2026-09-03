@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat - Sistem Parkir UTY</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        .stat-card {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.025);
+        }
+        
+        .badge-status {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+        
+        .pagination .page-link {
+            color: #495057;
+            border-color: #dee2e6;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        
+        .filter-card {
+            border-left: 4px solid #0d6efd;
+        }
+        
+        .export-card {
+            border-left: 4px solid #198754;
+        }
+        
+        .empty-state {
+            opacity: 0.7;
+        }
+        
+        .timestamp {
+            font-size: 0.875rem;
+        }
+        
+        .duration-cell {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .quick-stats {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- ==============================
+         HEADER SECTION
+    ============================== -->
+    <header class="bg-info text-white shadow-sm">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">
+                                <i class="fas fa-history me-2"></i>
+                                RIWAYAT AKTIFITAS PARKIR
+                            </h1>
+                            <p class="mb-0 opacity-75">Monitoring dan analisis data kendaraan masuk/keluar</p>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('index') }}" class="btn btn-light me-2">
+                                <i class="fas fa-home me-1"></i> Dashboard
+                            </a>
+                            <button id="refreshBtn" class="btn btn-warning">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==============================
+         MAIN CONTENT SECTION
+    ============================== -->
+    <main class="container-fluid py-4">
+        
+        <!-- ====================
+             QUICK STATS SECTION
+        ==================== -->
+        <section class="card shadow-sm quick-stats mb-4">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3">
+                            <div class="h2 mb-1" id="totalTransactions">{{ total_stats.total_transactions|default(0) }}</div>
+                            <div class="opacity-75">Total aktifitas</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3">
+                            <div class="h2 mb-1" id="activeEntries">{{ total_stats.active_entries|default(0) }}</div>
+                            <div class="opacity-75">Sedang Parkir</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3">
+                            <div class="h2 mb-1" id="todayEntries">{{ total_stats.today_entries|default(0) }}</div>
+                            <div class="opacity-75">Masuk Hari Ini</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3">
+                            <div class="h2 mb-1" id="manualVerifications">{{ total_stats.manual_verifications|default(0) }}</div>
+                            <div class="opacity-75">Verifikasi Manual</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================
+             FILTERS SECTION
+        ==================== -->
+        <section class="card shadow-sm filter-card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2 text-primary"></i>
+                    FILTER DATA
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Date Filters -->
+                    <div class="col-12 col-md-3">
+                        <label for="startDate" class="form-label fw-bold">Tanggal Mulai</label>
+                        <input type="date" class="form-control" id="startDate">
+                    </div>
+                    
+                    <div class="col-12 col-md-3">
+                        <label for="endDate" class="form-label fw-bold">Tanggal Akhir</label>
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                    
+                    <!-- Category Filter -->
+                    <div class="col-12 col-md-2">
+                        <label for="kategoriFilter" class="form-label fw-bold">Kategori</label>
+                        <select class="form-select" id="kategoriFilter">
+                            <option value="">Semua Kategori</option>
+                            <option value="Mahasiswa">Mahasiswa</option>
+                            <option value="Dosen">Dosen</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Tamu">Tamu</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Status Filter -->
+                    <div class="col-12 col-md-2">
+                        <label for="statusFilter" class="form-label fw-bold">Status</label>
+                        <select class="form-select" id="statusFilter">
+                            <option value="">Semua Status</option>
+                            <option value="Masuk">Masuk</option>
+                            <option value="Keluar">Keluar</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-bold">&nbsp;</label>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" id="filterBtn">
+                                <i class="fas fa-filter me-1"></i> Terapkan Filter
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="resetFilter">
+                                <i class="fas fa-times me-1"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Date Presets -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-primary" data-days="1">Hari Ini</button>
+                            <button type="button" class="btn btn-outline-primary" data-days="7">7 Hari</button>
+                            <button type="button" class="btn btn-outline-primary" data-days="30">30 Hari</button>
+                            <button type="button" class="btn btn-outline-primary" data-days="90">3 Bulan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================
+             DATA TABLE SECTION
+        ==================== -->
+        <section class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2 text-secondary"></i>
+                    DAFTAR AKTIFITAS PARKIR
+                </h5>
+                <div class="text-muted small">
+                    Menampilkan <span id="showingCount" class="fw-bold">{{ logs|length }}</span> dari 
+                    <span id="totalCount" class="fw-bold">{{ total_stats.total_transactions|default(0) }}</span> aktifitas
+                </div>
+            </div>
+            
+            <div class="card-body">
+                {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="12%">Waktu Masuk</th>
+                                <th width="12%">Waktu Keluar</th>
+                                <th width="8%">Plat Nomor</th>
+                                <th width="12%">Nama</th>
+                                <th width="8%">Kategori</th>
+                                <th width="10%">NPM/NIP</th>
+                                <th width="8%">Metode</th>
+                                <th width="8%">Status</th>
+                                <th width="10%">Durasi</th>
+                                <th width="12%">Petugas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            {% for log in logs %}
+                            <tr>
+                                <!-- Waktu Masuk -->
+                                <td>
+                                    {% if log.waktu_masuk %}
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">{{ log.waktu_masuk.strftime('%d/%m/%Y') }}</span>
+                                        <small class="text-muted timestamp">{{ log.waktu_masuk.strftime('%H:%M:%S') }}</small>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Waktu Keluar -->
+                                <td>
+                                    {% if log.waktu_keluar %}
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">{{ log.waktu_keluar.strftime('%d/%m/%Y') }}</span>
+                                        <small class="text-muted timestamp">{{ log.waktu_keluar.strftime('%H:%M:%S') }}</small>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Plat Nomor -->
+                                <td>
+                                    <span class="badge bg-dark fs-6 font-monospace">{{ log.plat_nomor }}</span>
+                                </td>
+                                
+                                <!-- Nama -->
+                                <td>
+                                    <strong>{{ log.nama or '-' }}</strong>
+                                </td>
+                                
+                                <!-- Kategori -->
+                                <td>
+                                    <span class="badge badge-status 
+                                        {% if log.kategori == 'Mahasiswa' %}bg-primary
+                                        {% elif log.kategori == 'Dosen' %}bg-success
+                                        {% elif log.kategori == 'Staff' %}bg-info
+                                        {% elif log.kategori == 'Tamu' %}bg-warning text-dark
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ log.kategori or '-' }}
+                                    </span>
+                                </td>
+                                
+                                <!-- NPM/NIP -->
+                                <td>
+                                    {% if log.npm_nip %}
+                                    <code class="font-monospace">{{ log.npm_nip }}</code>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Metode Verifikasi -->
+                                <td>
+                                    <span class="badge badge-status 
+                                        {% if log.metode_verifikasi == 'otomatis' %}bg-info
+                                        {% else %}bg-warning text-dark{% endif %}">
+                                        {{ log.metode_verifikasi }}
+                                    </span>
+                                </td>
+                                
+                                <!-- Status Akses -->
+                                <td>
+                                    <span class="badge badge-status 
+                                        {% if log.status == 'Masuk' %}bg-success
+                                        {% elif log.status == 'Keluar' %}bg-primary
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                
+                                <!-- Durasi -->
+                                <td class="duration-cell">
+                                    {% if log.durasi_menit %}
+                                        {% if log.durasi_menit >= 60 %}
+                                            {{ (log.durasi_menit // 60) }}j {{ (log.durasi_menit % 60) }}m
+                                        {% else %}
+                                            {{ log.durasi_menit }}m
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Petugas -->
+                                <td>
+                                    <small>{{ log.nama_petugas or 'System' }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- ====================
+                     PAGINATION SECTION
+                ==================== -->
+                {% if total_pages > 1 %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <!-- Previous Button -->
+                        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                            <a class="page-link" 
+                               href="?page={{ page-1 }}&limit={{ limit }}{{ filter_params }}"
+                               aria-label="Previous">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        
+                        <!-- Page Numbers -->
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p >= page-2 and p <= page+2 %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" 
+                                   href="?page={{ p }}&limit={{ limit }}{{ filter_params }}">
+                                    {{ p }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        <!-- Next Button -->
+                        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                            <a class="page-link" 
+                               href="?page={{ page+1 }}&limit={{ limit }}{{ filter_params }}"
+                               aria-label="Next">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <!-- ====================
+                     EMPTY STATE SECTION
+                ==================== -->
+                <div class="text-center py-5 empty-state">
+                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">Tidak Ada Data aktifitas</h4>
+                    <p class="text-muted mb-4">Belum ada riwayat aktifitas parkir yang tercatat</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">
+                            <i class="fas fa-home me-1"></i> Kembali ke Dashboard
+                        </a>
+                        <button class="btn btn-outline-secondary" onclick="resetFilters()">
+                            <i class="fas fa-times me-1"></i> Reset Filter
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- ====================
+             EXPORT SECTION
+        ==================== -->
+        <section class="card shadow-sm export-card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-download me-2 text-success"></i>
+                    EKSPOR DATA
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-12 col-md-8">
+                        <p class="mb-2 text-muted">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Data akan diekspor berdasarkan filter yang sedang aktif
+                        </p>
+                        <small class="text-muted">
+                            Format yang didukung: Excel (.xlsx) dan PDF/HTML
+                        </small>
+                    </div>
+                    <div class="col-12 col-md-4 text-end">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-success" id="exportExcel">
+                                <i class="fas fa-file-excel me-2"></i>Export Excel
+                            </button>
+                            <button type="button" class="btn btn-danger" id="exportPDF">
+                                <i class="fas fa-file-pdf me-2"></i>Export PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==============================
+        // INITIALIZATION
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFilters();
+            updateStatistics();
+            setupEventListeners();
+        });
+
+        // ==============================
+        // FILTER FUNCTIONS
+        // ==============================
+        function initializeFilters() {
+            // Set default date range (last 7 days)
+            const today = new Date().toISOString().split('T')[0];
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const oneWeekAgoStr = oneWeekAgo.toISOString().split('T')[0];
+            
+            if (!document.getElementById('startDate').value) {
+                document.getElementById('startDate').value = oneWeekAgoStr;
+            }
+            if (!document.getElementById('endDate').value) {
+                document.getElementById('endDate').value = today;
+            }
+        }
+
+        function setupEventListeners() {
+            // Filter buttons
+            document.getElementById('filterBtn').addEventListener('click', applyFilters);
+            document.getElementById('resetFilter').addEventListener('click', resetFilters);
+            
+            // Export buttons
+            document.getElementById('exportExcel').addEventListener('click', function() {
+                exportData('excel');
+            });
+            document.getElementById('exportPDF').addEventListener('click', function() {
+                exportData('pdf');
+            });
+            
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+                location.reload();
+            });
+            
+            // Quick date presets
+            document.querySelectorAll('[data-days]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const days = parseInt(this.dataset.days);
+                    setDateRange(days);
+                });
+            });
+            
+            // Enter key support for filters
+            ['startDate', 'endDate', 'kategoriFilter', 'statusFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') applyFilters();
+                });
+            });
+        }
+
+        function setDateRange(days) {
+            const today = new Date();
+            const startDate = new Date();
+            startDate.setDate(today.getDate() - days + 1); // +1 to include today
+            
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const kategori = document.getElementById('kategoriFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            // Validate date range
+            if (startDate && endDate && startDate > endDate) {
+                alert('Tanggal mulai tidak boleh lebih besar dari tanggal akhir');
+                return;
+            }
+            
+            let urlParams = new URLSearchParams();
+            
+            if (startDate) urlParams.append('start_date', startDate);
+            if (endDate) urlParams.append('end_date', endDate);
+            if (kategori) urlParams.append('kategori', kategori);
+            if (status) urlParams.append('status', status);
+            
+            const queryString = urlParams.toString();
+            window.location.href = queryString ? `/riwayat?${queryString}` : '/riwayat';
+        }
+
+        function resetFilters() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('kategoriFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            window.location.href = '/riwayat';
+        }
+
+        // ==============================
+        // EXPORT FUNCTIONS
+        // ==============================
+        function exportData(format) {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const kategori = document.getElementById('kategoriFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            let urlParams = new URLSearchParams();
+            urlParams.append('export', format);
+            
+            if (startDate) urlParams.append('start_date', startDate);
+            if (endDate) urlParams.append('end_date', endDate);
+            if (kategori) urlParams.append('kategori', kategori);
+            if (status) urlParams.append('status', status);
+            
+            window.open(`/api/export?${urlParams.toString()}`, '_blank');
+        }
+
+        // ==============================
+        // STATISTICS FUNCTIONS
+        // ==============================
+        function updateStatistics() {
+            fetch('/api/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('totalTransactions').textContent = data.data.total_transactions;
+                        document.getElementById('activeEntries').textContent = data.data.active_entries;
+                        document.getElementById('todayEntries').textContent = data.data.today_entries;
+                        document.getElementById('manualVerifications').textContent = data.data.manual_verifications;
+                    }
+                })
+                .catch(error => console.error('Error updating statistics:', error));
+        }
+
+        // Auto-refresh statistics every 30 seconds
+        setInterval(updateStatistics, 30000);
+
+        // ==============================
+        // TABLE ENHANCEMENTS
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add hover effects to table rows
+            const tableRows = document.querySelectorAll('#logsTableBody tr');
+            tableRows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = 'rgba(0, 123, 255, 0.05)';
+                });
+                
+                row.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = '';
+                });
+            });
+            
+            // Add click effect to badges
+            const badges = document.querySelectorAll('.badge');
+            badges.forEach(badge => {
+                badge.addEventListener('click', function() {
+                    const text = this.textContent.trim();
+                    if (text === 'Masuk' || text === 'Keluar') {
+                        document.getElementById('statusFilter').value = text;
+                        applyFilters();
+                    } else if (['Mahasiswa', 'Dosen', 'Staff', 'Tamu'].includes(text)) {
+                        document.getElementById('kategoriFilter').value = text;
+                        applyFilters();
+                    }
+                });
+                
+                // Add cursor pointer for clickable badges
+                if (['Masuk', 'Keluar', 'Mahasiswa', 'Dosen', 'Staff', 'Tamu'].includes(badge.textContent.trim())) {
+                    badge.style.cursor = 'pointer';
+                    badge.title = 'Klik untuk filter';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>

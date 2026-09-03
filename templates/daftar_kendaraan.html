@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Kendaraan - Sistem Parkir UTY</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        .vehicle-card {
+            border-left: 4px solid #0dcaf0;
+        }
+        
+        .category-badge {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+        
+        .user-card {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .user-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .plat-number {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .empty-state {
+            opacity: 0.7;
+        }
+        
+        .filter-card {
+            border-left: 4px solid #6c757d;
+        }
+        
+        .vehicle-badge {
+            font-size: 0.7rem;
+            margin: 0.1rem;
+        }
+        
+        .kendaraan-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+        }
+        
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #d4d4d4;
+        }
+        
+        .autocomplete-items div:hover {
+            background-color: #e9e9e9;
+        }
+        
+        .stats-card {
+            border-left: 4px solid #198754;
+        }
+        
+        .plat-format-note {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- ==============================
+         HEADER SECTION
+    ============================== -->
+    <header class="bg-info text-white shadow-sm">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-1">
+                                <i class="fas fa-car me-2"></i>
+                                DAFTAR KENDARAAN TERDAFTAR
+                            </h1>
+                            <p class="mb-0 opacity-75">Data lengkap pengguna dan kendaraan yang terdaftar di sistem</p>
+                            <small class="plat-format-note">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Format plat: TANPA SPASI (contoh: AB1234CD)
+                            </small>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('index') }}" class="btn btn-light me-2">
+                                <i class="fas fa-home me-1"></i> Dashboard
+                            </a>
+                            <a href="{{ url_for('registrasi') }}" class="btn btn-success me-2">
+                                <i class="fas fa-user-plus me-1"></i> Registrasi Baru
+                            </a>
+                            <!-- TOMBOL TAMBAH KENDARAAN BARU -->
+                            <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#tambahKendaraanModal">
+                                <i class="fas fa-car me-1"></i> Tambah Kendaraan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==============================
+         MAIN CONTENT SECTION
+    ============================== -->
+    <main class="container-fluid py-4">
+        
+        <!-- ====================
+             FILTERS SECTION
+        ==================== -->
+        <section class="card shadow-sm filter-card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2 text-primary"></i>
+                    FILTER DATA
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="filterForm" method="GET" action="{{ url_for('daftar_kendaraan') }}">
+                    <div class="row g-3">
+                        <!-- Category Filter -->
+                        <div class="col-12 col-md-4">
+                            <label for="kategori" class="form-label fw-bold">Kategori</label>
+                            <select class="form-select" id="kategori" name="kategori">
+                                <option value="">Semua Kategori</option>
+                                <option value="Mahasiswa" {% if selected_kategori == 'Mahasiswa' %}selected{% endif %}>Mahasiswa</option>
+                                <option value="Dosen" {% if selected_kategori == 'Dosen' %}selected{% endif %}>Dosen</option>
+                                <option value="Staff" {% if selected_kategori == 'Staff' %}selected{% endif %}>Staff</option>
+                                <option value="Tamu" {% if selected_kategori == 'Tamu' %}selected{% endif %}>Tamu</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Search Filter -->
+                        <div class="col-12 col-md-5">
+                            <label for="search" class="form-label fw-bold">Pencarian</label>
+                            <input type="text" class="form-control" id="search" name="search" 
+                                   placeholder="Cari berdasarkan nama, NPM/NIP, atau plat nomor..."
+                                   value="{{ search_query }}">
+                            <small class="form-text text-muted">Format plat: TANPA SPASI (contoh: AB1234CD)</small>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="col-12 col-md-3">
+                            <label class="form-label fw-bold">&nbsp;</label>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter me-1"></i> Terapkan Filter
+                                </button>
+                                <a href="{{ url_for('daftar_kendaraan') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-times me-1"></i> Reset
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ====================
+             VEHICLE STATISTICS
+        ==================== -->
+        <section class="card shadow-sm stats-card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2 text-success"></i>
+                    STATISTIK KENDARAAN
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    {% for category, stats in vehicle_stats.items() %}
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3 border rounded bg-light">
+                            <span class="badge 
+                                {% if category == 'Mahasiswa' %}bg-primary
+                                {% elif category == 'Dosen' %}bg-success
+                                {% elif category == 'Staff' %}bg-info
+                                {% elif category == 'Tamu' %}bg-warning text-dark
+                                {% else %}bg-secondary{% endif %} 
+                                category-badge mb-2">
+                                {{ category }}
+                            </span>
+                            <div class="h4 mb-1 text-primary">{{ stats.pengguna }}</div>
+                            <small class="text-muted">Pengguna</small>
+                            <div class="h4 mb-1 text-success mt-2">{{ stats.kendaraan }}</div>
+                            <small class="text-muted">Kendaraan</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Total Summary -->
+                    <div class="col-12 mt-3">
+                        <div class="row justify-content-center">
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 bg-primary text-white rounded">
+                                    <div class="h3 mb-1">{{ pengguna_list|length }}</div>
+                                    <small>Total Pengguna</small>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 bg-success text-white rounded">
+                                    <div class="h3 mb-1" id="totalKendaraan">0</div>
+                                    <small>Total Kendaraan</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================
+             VEHICLE LIST SECTION
+        ==================== -->
+        <section class="card shadow-sm vehicle-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2 text-info"></i>
+                    DAFTAR PENGGUNA & KENDARAAN
+                </h5>
+                <div class="text-muted small">
+                    Menampilkan {{ pengguna_list|length }} pengguna
+                </div>
+            </div>
+            
+            <div class="card-body">
+                {% if pengguna_list %}
+                <div class="row g-4">
+                    {% for pengguna in pengguna_list %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card user-card h-100">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 text-truncate">{{ pengguna.nama }}</h6>
+                                    <span class="badge 
+                                        {% if pengguna.kategori == 'Mahasiswa' %}bg-primary
+                                        {% elif pengguna.kategori == 'Dosen' %}bg-success
+                                        {% elif pengguna.kategori == 'Staff' %}bg-info
+                                        {% elif pengguna.kategori == 'Tamu' %}bg-warning text-dark
+                                        {% else %}bg-secondary{% endif %} 
+                                        category-badge">
+                                        {{ pengguna.kategori }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="card-body">
+                                <!-- User Information -->
+                                <div class="mb-3">
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-id-card me-2"></i>
+                                        {% if pengguna.npm_nip %}
+                                            {{ pengguna.npm_nip }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </small>
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-phone me-2"></i>
+                                        {{ pengguna.no_telp }}
+                                    </small>
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-envelope me-2"></i>
+                                        {{ pengguna.email }}
+                                    </small>
+                                </div>
+                                
+                                <!-- Vehicle Information -->
+                                <div class="border-top pt-3">
+                                    <h6 class="text-success mb-2">
+                                        <i class="fas fa-car me-2"></i>Kendaraan 
+                                        <span class="badge bg-secondary">{{ pengguna.kendaraan|length }}</span>
+                                    </h6>
+                                    
+                                    {% if pengguna.kendaraan %}
+                                    <div class="kendaraan-list">
+                                        {% for kendaraan in pengguna.kendaraan %}
+                                        <div class="mb-2 p-2 border rounded bg-light">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="plat-number badge bg-dark">{{ kendaraan.plat_nomor }}</span>
+                                                <span class="badge vehicle-badge {% if kendaraan.kendaraan_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    {% if kendaraan.kendaraan_active %}Aktif{% else %}Nonaktif{% endif %}
+                                                </span>
+                                            </div>
+                                            <small class="text-muted d-block">
+                                                <i class="fas fa-tag me-1"></i>{{ kendaraan.merk_model }}
+                                            </small>
+                                            <small class="text-muted d-block">
+                                                <i class="fas fa-palette me-1"></i>{{ kendaraan.warna }}
+                                            </small>
+                                            <small class="text-muted d-block">
+                                                <i class="fas fa-calendar me-1"></i>
+                                                Terdaftar: {{ kendaraan.created_at.strftime('%d/%m/%Y') }}
+                                            </small>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center py-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-exclamation-circle me-2"></i>
+                                            Belum ada kendaraan terdaftar
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="card-footer bg-transparent">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-2"></i>
+                                    Terdaftar: {{ pengguna.created_at.strftime('%d/%m/%Y') }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% else %}
+                <!-- ====================
+                     EMPTY STATE SECTION
+                ==================== -->
+                <div class="text-center py-5 empty-state">
+                    <i class="fas fa-car-side fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">Tidak Ada Data Kendaraan</h4>
+                    <p class="text-muted mb-4">
+                        {% if selected_kategori or search_query %}
+                            Tidak ditemukan data dengan filter yang dipilih
+                        {% else %}
+                            Belum ada kendaraan yang terdaftar di sistem
+                        {% endif %}
+                    </p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{{ url_for('registrasi') }}" class="btn btn-success">
+                            <i class="fas fa-user-plus me-1"></i> Registrasi Baru
+                        </a>
+                        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#tambahKendaraanModal">
+                            <i class="fas fa-car me-1"></i> Tambah Kendaraan
+                        </button>
+                        <a href="{{ url_for('daftar_kendaraan') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i> Reset Filter
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==============================
+         MODAL TAMBAH KENDARAAN
+    ============================== -->
+    <div class="modal fade" id="tambahKendaraanModal" tabindex="-1" aria-labelledby="tambahKendaraanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                
+                <!-- Modal Header -->
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="tambahKendaraanModalLabel">
+                        <i class="fas fa-car me-2"></i>
+                        TAMBAH KENDARAAN BARU
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    
+                    <!-- Info Alert -->
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informasi:</strong> Tambahkan kendaraan baru untuk pengguna yang sudah terdaftar di sistem.
+                        <strong>Format plat: TANPA SPASI (contoh: AB1234CD)</strong>
+                    </div>
+
+                    <!-- Form Tambah Kendaraan -->
+                    <form id="tambahKendaraanForm">
+                        
+                        <!-- Pencarian Pengguna -->
+                        <div class="mb-4">
+                            <label for="cariPengguna" class="form-label fw-bold">
+                                CARI PENGGUNA <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="cariPengguna" 
+                                   placeholder="Ketik nama atau NPM/NIP pengguna..."
+                                   required>
+                            <div class="form-text">
+                                Mulai ketik nama atau NPM/NIP, lalu pilih dari daftar yang muncul
+                            </div>
+                            <div id="autocompleteResults" class="autocomplete-items" style="display: none;"></div>
+                        </div>
+
+                        <!-- Info Pengguna Terpilih -->
+                        <div id="penggunaInfo" class="mb-4" style="display: none;">
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Pengguna terpilih</strong>
+                            </div>
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title text-success" id="selectedUserName"></h6>
+                                    <p class="card-text mb-1 small" id="selectedUserNpm"></p>
+                                    <p class="card-text mb-1 small" id="selectedUserKategori"></p>
+                                    <p class="card-text mb-0 small" id="selectedUserContact"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Kendaraan Baru -->
+                        <div class="border-top pt-3">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-car me-2"></i>DATA KENDARAAN BARU
+                            </h6>
+                            
+                            <!-- Plat Nomor -->
+                            <div class="mb-3">
+                                <label for="newPlatNomor" class="form-label fw-bold">
+                                    PLAT NOMOR <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="newPlatNomor" 
+                                       placeholder="Contoh: AB1234CD" 
+                                       required
+                                       oninput="validateNewVehicleForm()"
+                                       style="text-transform: uppercase;">
+                                <div class="form-text">
+                                    Format: Huruf-Angka-Huruf TANPA SPASI (contoh: AB1234CD atau B123XYZ)
+                                </div>
+                                <div id="plateCheckResult" class="mt-2" style="display: none;">
+                                    <div id="plateAvailable" class="alert alert-success py-2" style="display: none;">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        <span>Plat nomor tersedia</span>
+                                    </div>
+                                    <div id="plateExists" class="alert alert-danger py-2" style="display: none;">
+                                        <i class="fas fa-times-circle me-2"></i>
+                                        <span>Plat nomor sudah terdaftar di sistem</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Merk & Model -->
+                            <div class="mb-3">
+                                <label for="newMerkModel" class="form-label fw-bold">
+                                    MERK & MODEL <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="newMerkModel" 
+                                       placeholder="Contoh: Honda Vario, Toyota Avanza" 
+                                       required
+                                       oninput="validateNewVehicleForm()">
+                                <div class="form-text">
+                                    Gabungan merk dan model kendaraan
+                                </div>
+                            </div>
+                            
+                            <!-- Warna -->
+                            <div class="mb-3">
+                                <label for="newWarna" class="form-label fw-bold">
+                                    WARNA <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="newWarna" 
+                                       placeholder="Contoh: Hitam, Putih, Silver" 
+                                       required
+                                       oninput="validateNewVehicleForm()">
+                                <div class="form-text">
+                                    Warna kendaraan
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>BATAL
+                    </button>
+                    <button type="button" class="btn btn-warning" id="submitTambahKendaraan" disabled>
+                        <i class="fas fa-save me-1"></i>TAMBAH KENDARAAN
+                    </button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==============================
+        // VARIABEL GLOBAL
+        // ==============================
+        let selectedUser = null;
+        let isNewPlateAvailable = false;
+
+        // ==============================
+        // EVENT LISTENERS
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hitung total kendaraan
+            calculateTotalKendaraan();
+            
+            // Setup autocomplete untuk pencarian pengguna
+            setupUserAutocomplete();
+            
+            // Validasi form tambah kendaraan
+            document.getElementById('newPlatNomor').addEventListener('input', validateNewVehicleForm);
+            document.getElementById('newMerkModel').addEventListener('input', validateNewVehicleForm);
+            document.getElementById('newWarna').addEventListener('input', validateNewVehicleForm);
+            
+            // Submit form tambah kendaraan
+            document.getElementById('submitTambahKendaraan').addEventListener('click', submitTambahKendaraan);
+            
+            // Reset modal ketika ditutup
+            document.getElementById('tambahKendaraanModal').addEventListener('hidden.bs.modal', resetTambahKendaraanModal);
+        });
+
+        // ==============================
+        // FUNGSI UTAMA
+        // ==============================
+        function setupUserAutocomplete() {
+            const input = document.getElementById('cariPengguna');
+            const resultsContainer = document.getElementById('autocompleteResults');
+            
+            input.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                console.log('🔍 Searching for:', query); // Debug line
+                
+                if (query.length < 2) {
+                    resultsContainer.style.display = 'none';
+                    hideUserInfo();
+                    validateNewVehicleForm();
+                    return;
+                }
+                
+                // Cari pengguna via API
+                fetch(`/api/search_users?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('🔍 API Response:', data); // Debug line
+                        
+                        if (data.success && data.users && data.users.length > 0) {
+                            showAutocompleteResults(data.users);
+                        } else {
+                            console.log('🔍 No users found or API error'); // Debug line
+                            resultsContainer.style.display = 'none';
+                            // Tampilkan pesan tidak ada hasil
+                            if (data.success && data.users.length === 0) {
+                                showNoResultsMessage();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Error searching users:', error);
+                        resultsContainer.style.display = 'none';
+                        showErrorMessage('Error koneksi: ' + error);
+                    });
+            });
+            
+            // Tutup autocomplete ketika klik di luar
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !resultsContainer.contains(e.target)) {
+                    resultsContainer.style.display = 'none';
+                }
+            });
+        }
+
+        function showNoResultsMessage() {
+            const container = document.getElementById('autocompleteResults');
+            container.innerHTML = `
+                <div class="p-3 text-muted text-center">
+                    <i class="fas fa-search me-2"></i>
+                    Tidak ditemukan pengguna dengan kata kunci tersebut
+                </div>
+            `;
+            container.style.display = 'block';
+        }
+
+        function showAutocompleteResults(users) {
+            const container = document.getElementById('autocompleteResults');
+            container.innerHTML = '';
+            
+            console.log('🔍 Displaying users:', users); // Debug line
+            
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <strong>${user.nama}</strong>
+                    ${user.npm_nip ? `<br><small class="text-muted">${user.npm_nip} - ${user.kategori}</small>` : `<br><small class="text-muted">${user.kategori}</small>`}
+                `;
+                div.addEventListener('click', function() {
+                    selectUser(user);
+                });
+                div.style.cursor = 'pointer';
+                div.style.padding = '10px';
+                div.style.borderBottom = '1px solid #eee';
+                div.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                div.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'white';
+                });
+                container.appendChild(div);
+            });
+            
+            container.style.display = 'block';
+        }
+
+        function calculateTotalKendaraan() {
+            let total = 0;
+            document.querySelectorAll('.kendaraan-list .mb-2').forEach(() => {
+                total++;
+            });
+            document.getElementById('totalKendaraan').textContent = total;
+        }
+
+        function selectUser(user) {
+            selectedUser = user;
+            
+            // Update UI
+            document.getElementById('cariPengguna').value = user.nama;
+            document.getElementById('autocompleteResults').style.display = 'none';
+            
+            // Tampilkan info pengguna
+            document.getElementById('selectedUserName').textContent = `Nama: ${user.nama}`;
+            document.getElementById('selectedUserNpm').textContent = user.npm_nip ? `NPM/NIP: ${user.npm_nip}` : '';
+            document.getElementById('selectedUserKategori').textContent = `Kategori: ${user.kategori}`;
+            document.getElementById('selectedUserContact').textContent = `Kontak: ${user.no_telp} | ${user.email}`;
+            document.getElementById('penggunaInfo').style.display = 'block';
+            
+            // Validasi form
+            validateNewVehicleForm();
+        }
+
+        function hideUserInfo() {
+            selectedUser = null;
+            document.getElementById('penggunaInfo').style.display = 'none';
+        }
+
+        function validateNewVehicleForm() {
+            const platInput = document.getElementById('newPlatNomor');
+            let platNomor = platInput.value.trim().toUpperCase();
+            
+            // HAPUS SEMUA SPASI DARI INPUT
+            platNomor = platNomor.replace(/\s+/g, '');
+            platInput.value = platNomor;
+            
+            const merkModel = document.getElementById('newMerkModel').value.trim();
+            const warna = document.getElementById('newWarna').value.trim();
+            const hasSelectedUser = selectedUser !== null;
+            
+            // Validasi plat nomor
+            if (platNomor.length >= 5) {
+                checkNewPlateAvailability(platNomor);
+            } else {
+                hideNewPlateCheckResult();
+            }
+            
+            // Enable/disable submit button
+            const isValid = hasSelectedUser && platNomor && merkModel && warna && isNewPlateAvailable;
+            document.getElementById('submitTambahKendaraan').disabled = !isValid;
+        }
+
+        function checkNewPlateAvailability(plateNumber) {
+            fetch(`/api/check_plate?plate=${encodeURIComponent(plateNumber)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const resultContainer = document.getElementById('plateCheckResult');
+                    
+                    if (data.success) {
+                        if (data.exists) {
+                            // Plate already exists
+                            document.getElementById('plateAvailable').style.display = 'none';
+                            document.getElementById('plateExists').style.display = 'block';
+                            resultContainer.style.display = 'block';
+                            isNewPlateAvailable = false;
+                        } else {
+                            // Plate is available
+                            document.getElementById('plateAvailable').style.display = 'block';
+                            document.getElementById('plateExists').style.display = 'none';
+                            resultContainer.style.display = 'block';
+                            isNewPlateAvailable = true;
+                        }
+                    }
+                    validateNewVehicleForm();
+                })
+                .catch(error => {
+                    console.error('Error checking plate:', error);
+                    hideNewPlateCheckResult();
+                });
+        }
+
+        function hideNewPlateCheckResult() {
+            document.getElementById('plateCheckResult').style.display = 'none';
+            isNewPlateAvailable = false;
+        }
+
+        function submitTambahKendaraan() {
+            const btn = document.getElementById('submitTambahKendaraan');
+            const originalText = btn.innerHTML;
+            
+            // Update button state
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>MEMPROSES...';
+            btn.disabled = true;
+
+            // Prepare form data
+            const formData = {
+                user_id: selectedUser.id_pengguna,
+                plat_nomor: document.getElementById('newPlatNomor').value.trim().toUpperCase(),
+                merk_model: document.getElementById('newMerkModel').value.trim(),
+                warna: document.getElementById('newWarna').value.trim()
+            };
+
+            // Send request to server
+            fetch('/api/add_vehicle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessMessage('Kendaraan berhasil ditambahkan!');
+                    
+                    // Close modal and refresh page after delay
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('tambahKendaraanModal'));
+                        modal.hide();
+                        location.reload(); // Refresh untuk menampilkan data terbaru
+                    }, 2000);
+                } else {
+                    showErrorMessage('Gagal menambahkan kendaraan: ' + data.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                showErrorMessage('Error: ' + error);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        function resetTambahKendaraanModal() {
+            // Reset form values
+            document.getElementById('tambahKendaraanForm').reset();
+            
+            // Reset state
+            selectedUser = null;
+            isNewPlateAvailable = false;
+            
+            // Reset UI
+            hideUserInfo();
+            hideNewPlateCheckResult();
+            document.getElementById('autocompleteResults').style.display = 'none';
+            document.getElementById('submitTambahKendaraan').disabled = true;
+        }
+
+        function showSuccessMessage(message) {
+            // Anda bisa menggunakan alert atau toast notification
+            alert('✅ ' + message);
+        }
+
+        function showErrorMessage(message) {
+            alert('❌ ' + message);
+        }
+
+        // ==============================
+        // FUNGSI BANTUAN
+        // ==============================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-submit form when category changes
+            document.getElementById('kategori').addEventListener('change', function() {
+                document.getElementById('filterForm').submit();
+            });
+            
+            // Add hover effects to cards
+            document.querySelectorAll('.user-card').forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.boxShadow = '';
+                });
+            });
+            
+            // Auto-focus search field if it has value
+            const searchField = document.getElementById('search');
+            if (searchField.value) {
+                searchField.focus();
+            }
+        });
+
+    </script>
+</body>
+</html>
